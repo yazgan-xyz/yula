@@ -69,4 +69,5 @@ pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin gunce
 - Tool-calling quality depends on the Ollama model you choose.
 - For the smoothest experience, use a model that supports tool calling well.
 - `YULA_DEBUG=1` prints the loaded MCP tools and the raw tool outputs, so you can verify whether MCP returned data even if the model does not produce a final natural-language sentence.
+- If an Ollama model emits a textual JSON tool request instead of a native LangChain `tool_call`, this example now detects that pattern, executes the MCP tool as a fallback, prints the raw tool result, and does one final model pass to turn that tool result into a user-facing answer.
 - The LangChain JS `ChatOllama` integration is documented here: [LangChain ChatOllama docs](https://docs.langchain.com/oss/javascript/integrations/chat/ollama)
