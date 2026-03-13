@@ -1,0 +1,4 @@
+# This directory is required in runtime.
+
+*
+!.gitignore

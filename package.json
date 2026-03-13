@@ -1,0 +1,45 @@
+{
+  "name": "@yula-xyz/monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "yula-js-ai-caller - main monorepo repository",
+  "keywords": [
+    "yula",
+    "mcp-server",
+    "monorepo"
+  ],
+  "author": "code@example.com",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {},
+  "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "lint-staged": {
+    "**/*.{js,ts,tsx}": [
+      "biome lint --write"
+    ],
+    "**/*": "biome format --write"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky",
+    "dev:all": "pnpm --filter @yula-xyz/* dev",
+    "worker": "pnpm --filter @yula-xyz/worker",
+    "publisher": "pnpm --filter @yula-xyz/publisher"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.1.2",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2"
+  },
+  "contributors": [
+    {
+      "name": "Alper Reha YAZGAN",
+      "email": "[EMAIL_ADDRESS]"
+    }
+  ]
+}

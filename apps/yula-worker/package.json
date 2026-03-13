@@ -1,0 +1,23 @@
+{
+  "name": "@yula-xyz/worker",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "serve": "pnpm workerd serve config/config.capnp --verbose",
+    "build": "pnpm esbuild src/router.ts --outfile=dist/_router.js --format=esm --target=esnext --bundle --minify",
+    "sync": "curl -o config.zip http://localhost:8086/api/config && unzip config.zip -d ./config && rm config.zip"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "workerd": "^1.20260313.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260313.1",
+    "@types/node": "^20.11.17",
+    "esbuild": "^0.27.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,26 @@
+@host = http://localhost:{{$dotenv PORT}}
+
+### publish call
+POST {{host}}/api/publish
+Content-Type: application/json
+
+{
+    "name": "hello-world",
+    "module": "export default { fetch(){ return new Response(JSON.stringify({\"hello\":\"world\"})); }}"
+} 
+
+
+
+### publish call - 2
+POST {{host}}/api/publish
+Content-Type: application/json
+
+{
+    "name": "echo",
+    "module": "export default { fetch(req){ return new Response(JSON.stringify({method:req.method, url:req.url, headers:req.headers})); }}"
+} 
+
+
+
+### get-config call
+GET {{host}}/api/config

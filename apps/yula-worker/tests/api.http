@@ -1,0 +1,4 @@
+@host = http://localhost:{{$dotenv PORT}}
+
+### Test "hello" function
+GET {{host}}/hello
