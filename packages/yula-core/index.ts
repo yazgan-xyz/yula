@@ -1,1 +1,1 @@
-export default "yula-core";
+export * from "./src/index.js";

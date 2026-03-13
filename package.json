@@ -27,7 +27,9 @@
     "prepare": "husky",
     "dev:all": "pnpm --filter @yula-xyz/* dev",
     "worker": "pnpm --filter @yula-xyz/worker",
-    "publisher": "pnpm --filter @yula-xyz/publisher"
+    "publisher": "pnpm --filter @yula-xyz/publisher",
+    "example-hono": "pnpm --filter @yula-example/mcp-hono-stateless",
+    "example-agent": "pnpm --filter @yula-example/langchain-openai-agent"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.2",

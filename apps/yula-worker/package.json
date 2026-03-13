@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "serve": "pnpm workerd serve config/config.capnp --verbose",
-    "build": "pnpm esbuild src/router.ts --outfile=dist/_router.js --format=esm --target=esnext --bundle --minify",
-    "sync": "curl -o config.zip http://localhost:8086/api/config && unzip config.zip -d ./config && rm config.zip"
+    "build": "pnpm esbuild src/router.ts --outfile=config/_router.js --format=esm --target=esnext --bundle --minify",
+    "sync": "curl -o config.zip http://localhost:8086/api/config && unzip -oq config.zip -d ./config && rm config.zip"
   },
   "engines": {
     "node": ">=20"

@@ -1,41 +1,146 @@
-# yula - workerd based mcp save-call manager
+# Yula
 
-![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+Yula is a dynamic JavaScript function registry and execution layer built on top of Cloudflare's `workerd`. It is designed for AI tooling use cases where you want to:
 
-Yula is a serverless-style functional execution engine built on top of Cloudflare's `workerd` runtime, designed specifically to provide a flexible and dynamic call registry for AI agents. 
+- publish fetch-native workers at runtime,
+- serve them through a stable router,
+- expose them as MCP servers,
+- and let agents call them through LangChain or direct HTTP.
 
-By operating as a Model Context Protocol (MCP) server integration backend, Yula allows AI agents to dynamically generate, serialize, and execute modular JavaScript functions on the fly. 
+## Workspace layout
 
-## Architecture
+- `apps/yula-publisher`: accepts published worker modules and generates the `workerd` bundle (`config.capnp` + JS modules).
+- `apps/yula-worker`: downloads that bundle, mounts it into `workerd`, and routes incoming requests by worker name.
+- `packages/yula-core`: fetch-native SDK for building Yula-compatible MCP servers.
+- `examples/mcp-hono-stateless`: example MCP worker built with `@yula-xyz/core`.
+- `examples/langchain-openai-agent`: example LangChain + OpenAI agent that connects to the published MCP server.
 
-The Yula ecosystem consists of two core applications working in tandem:
+## Requirements
 
-1. **`yula-publisher`**: A centralized registry and configuration generator. AI agents hit this API to register new ECMAScript modules (tools/functions). The publisher persists these modules and bundles them on the fly into a `workerd` ZIP-compatible payload (`config.capnp` + JavaScript modules) using `fflate`.
-2. **`yula-worker`**: The execution runtime. It fetches the dynamically generated bundled configuration from the publisher, inflates it, and instantly routes incoming requests to the respective in-memory instantiated background workers via the `workerd` engine.
+- Node.js `>= 22`
+- pnpm `>= 10`
 
-## Use Case
+## Install
 
-Rather than hardcoding static predefined tool functions for an LLM agent, Yula allows the agent to iteratively write **single-file JavaScript functions** that instantly become executable HTTP endpoints. 
+```bash
+pnpm install
+```
 
-This enables self-healing and evolving capabilities for agents to write their *own* tools dynamically across conversational memory.
+## Demo flow
 
-## Development & Setup
+This is the fastest path to see the new MCP flow end-to-end.
 
-Yula is a monorepo managed by `pnpm` workspaces.
+### 1. Start the publisher
 
-### Pre-requisites
-- Node.js >= 22
-- pnpm >= 10.x
+Terminal 1:
 
-### Quick Start
-1. Clone the repository and install dependencies:
-   ```bash
-   pnpm install
-   ```
+```bash
+pnpm --filter @yula-xyz/publisher build
+cd apps/yula-publisher
+node dist/index.js
+```
 
-2. Start the entire ecosystem:
-   ```bash
-   pnpm dev:all
-   ```
-   
-*(Alternatively, you can run `pnpm publisher` to start the registry or `pnpm worker` to start the execution environment separately).*
+Publisher listens on `http://localhost:8086`.
+
+### 2. Build and publish the example MCP worker
+
+Terminal 2:
+
+```bash
+pnpm --filter @yula-example/mcp-hono-stateless build
+pnpm --filter @yula-example/mcp-hono-stateless publish:local
+```
+
+By default this publishes the worker as `math-mcp-v1-0-0`.
+
+### 3. Sync and start the Yula runtime
+
+Terminal 3:
+
+```bash
+pnpm --filter @yula-xyz/worker build
+cd apps/yula-worker
+pnpm sync
+pnpm serve
+```
+
+The public worker runtime listens on `http://localhost:8080`.
+
+## Smoke tests
+
+### Direct HTTP helper endpoint
+
+```bash
+curl -X POST http://127.0.0.1:8080/math-mcp-v1-0-0/mcp/tools/add \
+  -H 'Content-Type: application/json' \
+  -d '{"a":12,"b":30}'
+```
+
+Expected result:
+
+```json
+{
+  "structuredContent": {
+    "total": 42
+  }
+}
+```
+
+### MCP initialize
+
+```bash
+curl -X POST http://127.0.0.1:8080/math-mcp-v1-0-0/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"demo","version":"1.0.0"}}}'
+```
+
+### MCP tool call
+
+```bash
+curl -X POST http://127.0.0.1:8080/math-mcp-v1-0-0/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-03-26' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add","arguments":{"a":7,"b":8}}}'
+```
+
+Expected result:
+
+```json
+{
+  "result": {
+    "structuredContent": {
+      "total": 15
+    }
+  }
+}
+```
+
+## LangChain + OpenAI demo
+
+After the three local services above are running:
+
+```bash
+export OPENAI_API_KEY=YOUR_KEY
+export YULA_MCP_URL=http://localhost:8080/math-mcp-v1-0-0/mcp
+pnpm --filter @yula-example/langchain-openai-agent start -- "127 ile 19'u carp ve sonucu bana soyle"
+```
+
+The agent will load tools from the MCP server via `MultiServerMCPClient`, let `ChatOpenAI` decide when to call them, and then return the final answer.
+
+## Notes
+
+- Published worker route names can include dashes like `math-mcp-v1-0-0`. The publisher now normalizes those names into valid Cap'n Proto identifiers internally.
+- The example MCP worker also exposes:
+  - `GET /math-mcp-v1-0-0/mcp/tools`
+  - `GET /math-mcp-v1-0-0/mcp/docs`
+  - `GET /math-mcp-v1-0-0/mcp/openapi.json`
+
+## More detail
+
+- [Publisher README](/Users/alperreha/Desktop/alper/workspace/ai/yula/apps/yula-publisher/README.md)
+- [Worker README](/Users/alperreha/Desktop/alper/workspace/ai/yula/apps/yula-worker/README.md)
+- [Core SDK README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-core/README.md)
+- [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-hono-stateless/README.md)
+- [LangChain agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/README.md)

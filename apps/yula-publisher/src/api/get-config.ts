@@ -4,6 +4,28 @@ import { strToU8, zipSync } from "fflate";
 import type { WorkerConfig, WorkerDefinition } from "./models.js";
 import type { Context } from "hono";
 
+function toCapnpIdentifier(name: string, usedIdentifiers: Set<string>) {
+    const tokens = name
+        .split(/[^a-zA-Z0-9]+/)
+        .filter(Boolean)
+        .map((token) => token.replace(/[^a-zA-Z0-9]/g, ""));
+
+    const [firstToken = "worker", ...restTokens] = tokens;
+    const firstIdentifierToken = firstToken.replace(/^[^a-zA-Z]+/, "");
+    const normalized = [
+        (firstIdentifierToken || "worker").replace(/^./, (char) => char.toLowerCase()),
+        ...restTokens.map((token) => token.replace(/^./, (char) => char.toUpperCase())),
+    ].join("") || "worker";
+
+    let candidate = normalized || "worker";
+    let suffix = 1;
+    while (usedIdentifiers.has(candidate)) {
+        candidate = `${normalized}_${suffix++}`;
+    }
+
+    usedIdentifiers.add(candidate);
+    return candidate;
+}
 
 export const getConfig = async (c: Context) => {
 
@@ -19,6 +41,7 @@ export const getConfig = async (c: Context) => {
     let capnp = await fs.readFile("config.template.capnp", "utf8");
 
     const modules = new Map<string, Uint8Array>();
+    const usedIdentifiers = new Set<string>();
     const config: WorkerConfig = {
         routes: []
     };
@@ -30,6 +53,7 @@ export const getConfig = async (c: Context) => {
 
         config.routes.push(definition.name);
         modules.set(`${definition.name}.js`, strToU8(definition.module));
+        const workerIdentifier = toCapnpIdentifier(definition.name, usedIdentifiers);
 
 
         // generate capnp workerd config
@@ -37,7 +61,7 @@ export const getConfig = async (c: Context) => {
         // 2- define service
         // 3- add a binding to the router service
         capnp += `
-const ${definition.name} :Workerd.Worker = (
+const ${workerIdentifier} :Workerd.Worker = (
     compatibilityDate = "${definition.compatibilityDate || "2023-02-28"}",
     modules = [(name = "${definition.name}.js", esModule = embed "${definition.name}.js")],
 );`;
@@ -45,7 +69,7 @@ const ${definition.name} :Workerd.Worker = (
         const serviceStr = "services = [";
         const serviceIdx = capnp.indexOf(serviceStr);
         capnp = capnp.substring(0, serviceIdx + serviceStr.length) +
-            `\n    (name = "${definition.name}", worker = .${definition.name}),` +
+            `\n    (name = "${definition.name}", worker = .${workerIdentifier}),` +
             capnp.substring(serviceIdx + serviceStr.length);
 
         const bindingStr = "bindings = [";

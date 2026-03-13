@@ -1,22 +1,90 @@
 # yula-worker
 
-The **execution engine** for the Yula ecosystem, powered by Cloudflare's `workerd`.
+`yula-worker` is the runtime process that turns published worker modules into live HTTP endpoints using Cloudflare `workerd`.
 
-This system is responsible for pulling bundled tool definitions from the [yula-publisher](../yula-publisher) and serving them continuously as lightning-fast V8 isolates.
+It has two jobs:
 
-## Lifecycle
+1. build the shared router that dispatches requests by worker name,
+2. sync the latest published config bundle from `yula-publisher`.
 
-1. **Sync**: The worker requests `GET /api/config` from the publisher, fetching the bundled `config.zip` containing all user-defined JavaScript modules and bindings.
-2. **Unpack**: It unzips the payload into its local `/config` directory.
-3. **Execute**: The `workerd` engine starts routing HTTP requests against the dynamic `config.capnp` mapping to the unzipped localized workers.
+## Local flow
 
-## Commands
+### Build the router
 
-### `pnpm sync`
-Hits the publisher (`http://localhost:8086/api/config`), downloads the ZIP bundle, extracts its contents into `./config`, and cleans up the initial compressed file.
+```bash
+pnpm --filter @yula-xyz/worker build
+```
 
-### `pnpm serve`
-Starts the local Cloudflare `workerd` instance against the `config.capnp` definition unpacked from the publisher.
+This writes the router bundle directly to:
 
-### `pnpm build`
-Builds internal router mechanisms (if utilized dynamically) using `esbuild`.
+```text
+apps/yula-worker/config/_router.js
+```
+
+### Sync published workers
+
+```bash
+cd apps/yula-worker
+pnpm sync
+```
+
+This downloads `http://localhost:8086/api/config`, overwrites the local `config` directory contents, and refreshes:
+
+- `config.capnp`
+- `_meta.json`
+- each published worker module
+
+### Start `workerd`
+
+```bash
+pnpm serve
+```
+
+Default public address:
+
+```text
+http://localhost:8080
+```
+
+## Route model
+
+Each published worker is exposed under its published name:
+
+```text
+http://localhost:8080/<worker-name>/...
+```
+
+For the demo MCP worker:
+
+```text
+http://localhost:8080/math-mcp-v1-0-0/mcp
+```
+
+## Demo smoke tests
+
+Direct helper endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:8080/math-mcp-v1-0-0/mcp/tools/add \
+  -H 'Content-Type: application/json' \
+  -d '{"a":12,"b":30}'
+```
+
+MCP initialize:
+
+```bash
+curl -X POST http://127.0.0.1:8080/math-mcp-v1-0-0/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"demo","version":"1.0.0"}}}'
+```
+
+MCP tool call:
+
+```bash
+curl -X POST http://127.0.0.1:8080/math-mcp-v1-0-0/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-03-26' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add","arguments":{"a":7,"b":8}}}'
+```
