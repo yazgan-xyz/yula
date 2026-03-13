@@ -8,6 +8,8 @@ It uses:
 - `ChatOpenAI` from `@langchain/openai`
 - the MCP endpoint exposed by the published math demo worker
 
+If you want the same flow with a local model instead, use the sibling Ollama example at [examples/langchain-ollama-agent](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-ollama-agent/README.md).
+
 ## Prerequisites
 
 Before running this example, the local Yula demo stack should already be up:

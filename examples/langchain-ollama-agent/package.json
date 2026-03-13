@@ -1,0 +1,19 @@
+{
+  "name": "@yula-example/langchain-ollama-agent",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/mcp-adapters": "^1.1.3",
+    "@langchain/ollama": "^1.2.6",
+    "langchain": "^1.2.32"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}

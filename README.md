@@ -15,6 +15,7 @@ Yula is a dynamic JavaScript function registry and execution layer built on top 
 - `examples/mcp-hono-stateless`: example MCP worker built with `@yula-xyz/core`.
 - `examples/mcp-live-weather`: example MCP worker that fetches live weather and local time from Open-Meteo.
 - `examples/langchain-openai-agent`: example LangChain + OpenAI agent that connects to the published MCP server.
+- `examples/langchain-ollama-agent`: example LangChain + Ollama agent that connects to the same MCP servers.
 
 ## Requirements
 
@@ -130,6 +131,24 @@ pnpm --filter @yula-example/langchain-openai-agent start -- "127 ile 19'u carp v
 
 The agent will load tools from the MCP server via `MultiServerMCPClient`, let `ChatOpenAI` decide when to call them, and then return the final answer.
 
+## LangChain + Ollama demo
+
+If you want the exact same agent flow against your local Ollama instead of OpenAI:
+
+```bash
+export OLLAMA_MODEL=llama3.1
+export OLLAMA_BASE_URL=http://127.0.0.1:11434
+export YULA_MCP_URL=http://localhost:8080/math-mcp-v1-0-0/mcp
+pnpm --filter @yula-example/langchain-ollama-agent start -- "127 ile 19'u carp ve sonucu bana soyle"
+```
+
+For the live weather MCP server:
+
+```bash
+export YULA_MCP_URL=http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
+```
+
 ## Live weather demo
 
 If you want a clearly real-time example instead of the deterministic math demo:
@@ -182,3 +201,4 @@ That pair makes it easy to verify the result is being fetched live.
 - [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-hono-stateless/README.md)
 - [Live weather MCP example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-live-weather/README.md)
 - [LangChain agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/README.md)
+- [LangChain Ollama agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-ollama-agent/README.md)

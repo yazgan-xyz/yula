@@ -3,7 +3,7 @@ import { createPublisherDefinition } from "@yula-xyz/core";
 
 const publisherUrl =
   process.env.PUBLISHER_URL ?? "http://localhost:8086/api/publish";
-const workerName = process.env.YULA_WORKER_NAME ?? "weather-live-mcp";
+const workerName = process.env.YULA_WORKER_NAME ?? "weather-live";
 const workerVersion = process.env.YULA_WORKER_VERSION ?? "1.0.0";
 const compatibilityDate =
   process.env.YULA_COMPATIBILITY_DATE ?? "2023-02-28";
