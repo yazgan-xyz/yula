@@ -145,7 +145,7 @@ pnpm --filter @yula-example/langchain-ollama-agent start -- "127 ile 19'u carp v
 For the live weather MCP server:
 
 ```bash
-export YULA_MCP_URL=http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+export YULA_MCP_URL=http://localhost:8080/weather-live-v1-0-0/mcp
 pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
 ```
 
@@ -171,7 +171,7 @@ pnpm serve
 ### 3. Call the live weather tool
 
 ```bash
-curl -X POST http://127.0.0.1:8080/weather-live-mcp-v1-0-0/mcp/tools/current-weather \
+curl -X POST http://127.0.0.1:8080/weather-live-v1-0-0/mcp/tools/current-weather \
   -H 'Content-Type: application/json' \
   -d '{"city":"Istanbul","countryCode":"TR"}'
 ```
@@ -190,7 +190,7 @@ That pair makes it easy to verify the result is being fetched live.
   - `GET /math-mcp-v1-0-0/mcp/tools`
   - `GET /math-mcp-v1-0-0/mcp/docs`
   - `GET /math-mcp-v1-0-0/mcp/openapi.json`
-- The live weather worker exposes the same helper routes under `weather-live-mcp-v1-0-0`.
+- The live weather worker exposes the same helper routes under `weather-live-v1-0-0`.
 - The live weather example requires outbound internet access because it calls Open-Meteo in real time.
 
 ## More detail

@@ -27,7 +27,7 @@ http://localhost:8080/math-mcp-v1-0-0/mcp
 You can also point the same agent to the live weather example:
 
 ```text
-http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+http://localhost:8080/weather-live-v1-0-0/mcp
 ```
 
 ## Environment
@@ -43,13 +43,14 @@ Optional:
 
 ```bash
 export OPENAI_MODEL=gpt-4.1-mini
+export YULA_DEBUG=1
 export YULA_AUTH_TOKEN=...
 ```
 
 To switch to the live weather demo:
 
 ```bash
-export YULA_MCP_URL=http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+export YULA_MCP_URL=http://localhost:8080/weather-live-v1-0-0/mcp
 ```
 
 ## Run
@@ -64,6 +65,8 @@ The agent will:
 2. decide when to call those tools,
 3. feed the tool result back into the model,
 4. and print the final answer.
+
+If the model calls a tool but does not produce a final text answer, the example now falls back to printing the last MCP tool output. With `YULA_DEBUG=1`, it also prints the loaded tools and raw tool outputs.
 
 ## Suggested demo prompt
 

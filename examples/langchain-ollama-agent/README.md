@@ -40,13 +40,14 @@ Optional:
 ```bash
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export YULA_MCP_URL=http://localhost:8080/math-mcp-v1-0-0/mcp
+export YULA_DEBUG=1
 export YULA_AUTH_TOKEN=...
 ```
 
 You can also point it to the live weather MCP example:
 
 ```bash
-export YULA_MCP_URL=http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+export YULA_MCP_URL=http://localhost:8080/weather-live-v1-0-0/mcp
 ```
 
 ## Run
@@ -67,4 +68,5 @@ pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin gunce
 
 - Tool-calling quality depends on the Ollama model you choose.
 - For the smoothest experience, use a model that supports tool calling well.
+- `YULA_DEBUG=1` prints the loaded MCP tools and the raw tool outputs, so you can verify whether MCP returned data even if the model does not produce a final natural-language sentence.
 - The LangChain JS `ChatOllama` integration is documented here: [LangChain ChatOllama docs](https://docs.langchain.com/oss/javascript/integrations/chat/ollama)

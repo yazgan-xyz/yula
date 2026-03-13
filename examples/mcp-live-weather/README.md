@@ -54,19 +54,19 @@ pnpm --filter @yula-example/mcp-live-weather publish:local
 Default published route:
 
 ```text
-weather-live-mcp-v1-0-0
+weather-live-v1-0-0
 ```
 
 Final MCP URL through Yula:
 
 ```text
-http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+http://localhost:8080/weather-live-v1-0-0/mcp
 ```
 
 ## Direct test after publish + sync + serve
 
 ```bash
-curl -X POST http://127.0.0.1:8080/weather-live-mcp-v1-0-0/mcp/tools/current-weather \
+curl -X POST http://127.0.0.1:8080/weather-live-v1-0-0/mcp/tools/current-weather \
   -H 'Content-Type: application/json' \
   -d '{"city":"Istanbul","countryCode":"TR"}'
 ```
@@ -79,7 +79,7 @@ You should see both:
 ## MCP JSON-RPC test
 
 ```bash
-curl -X POST http://127.0.0.1:8080/weather-live-mcp-v1-0-0/mcp \
+curl -X POST http://127.0.0.1:8080/weather-live-v1-0-0/mcp \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -H 'MCP-Protocol-Version: 2025-03-26' \
