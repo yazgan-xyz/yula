@@ -22,6 +22,12 @@ Target MCP URL:
 http://localhost:8080/math-mcp-v1-0-0/mcp
 ```
 
+You can also point the same agent to the live weather example:
+
+```text
+http://localhost:8080/weather-live-mcp-v1-0-0/mcp
+```
+
 ## Environment
 
 Required:
@@ -36,6 +42,12 @@ Optional:
 ```bash
 export OPENAI_MODEL=gpt-4.1-mini
 export YULA_AUTH_TOKEN=...
+```
+
+To switch to the live weather demo:
+
+```bash
+export YULA_MCP_URL=http://localhost:8080/weather-live-mcp-v1-0-0/mcp
 ```
 
 ## Run
@@ -55,6 +67,12 @@ The agent will:
 
 ```bash
 pnpm --filter @yula-example/langchain-openai-agent start -- "11 ile 13'u carp, sonra sonucu 5'e bol ve bana tek cumleyle soyle"
+```
+
+Weather-specific prompt:
+
+```bash
+pnpm --filter @yula-example/langchain-openai-agent start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
 ```
 
 ## Related files

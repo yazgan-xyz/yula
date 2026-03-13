@@ -29,7 +29,8 @@
     "worker": "pnpm --filter @yula-xyz/worker",
     "publisher": "pnpm --filter @yula-xyz/publisher",
     "example-hono": "pnpm --filter @yula-example/mcp-hono-stateless",
-    "example-agent": "pnpm --filter @yula-example/langchain-openai-agent"
+    "example-agent": "pnpm --filter @yula-example/langchain-openai-agent",
+    "example-weather": "pnpm --filter @yula-example/mcp-live-weather"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.2",

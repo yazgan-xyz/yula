@@ -13,6 +13,7 @@ Yula is a dynamic JavaScript function registry and execution layer built on top 
 - `apps/yula-worker`: downloads that bundle, mounts it into `workerd`, and routes incoming requests by worker name.
 - `packages/yula-core`: fetch-native SDK for building Yula-compatible MCP servers.
 - `examples/mcp-hono-stateless`: example MCP worker built with `@yula-xyz/core`.
+- `examples/mcp-live-weather`: example MCP worker that fetches live weather and local time from Open-Meteo.
 - `examples/langchain-openai-agent`: example LangChain + OpenAI agent that connects to the published MCP server.
 
 ## Requirements
@@ -129,6 +130,40 @@ pnpm --filter @yula-example/langchain-openai-agent start -- "127 ile 19'u carp v
 
 The agent will load tools from the MCP server via `MultiServerMCPClient`, let `ChatOpenAI` decide when to call them, and then return the final answer.
 
+## Live weather demo
+
+If you want a clearly real-time example instead of the deterministic math demo:
+
+### 1. Publish the weather worker
+
+```bash
+pnpm --filter @yula-example/mcp-live-weather build
+pnpm --filter @yula-example/mcp-live-weather publish:local
+```
+
+### 2. Resync and serve the runtime
+
+```bash
+cd apps/yula-worker
+pnpm sync
+pnpm serve
+```
+
+### 3. Call the live weather tool
+
+```bash
+curl -X POST http://127.0.0.1:8080/weather-live-mcp-v1-0-0/mcp/tools/current-weather \
+  -H 'Content-Type: application/json' \
+  -d '{"city":"Istanbul","countryCode":"TR"}'
+```
+
+Look for these two fields in the response:
+
+- `observedAt`: timestamp returned by the weather provider for the live observation
+- `fetchedAtUtc`: timestamp created by the MCP worker when it performed the fetch
+
+That pair makes it easy to verify the result is being fetched live.
+
 ## Notes
 
 - Published worker route names can include dashes like `math-mcp-v1-0-0`. The publisher now normalizes those names into valid Cap'n Proto identifiers internally.
@@ -136,6 +171,8 @@ The agent will load tools from the MCP server via `MultiServerMCPClient`, let `C
   - `GET /math-mcp-v1-0-0/mcp/tools`
   - `GET /math-mcp-v1-0-0/mcp/docs`
   - `GET /math-mcp-v1-0-0/mcp/openapi.json`
+- The live weather worker exposes the same helper routes under `weather-live-mcp-v1-0-0`.
+- The live weather example requires outbound internet access because it calls Open-Meteo in real time.
 
 ## More detail
 
@@ -143,4 +180,5 @@ The agent will load tools from the MCP server via `MultiServerMCPClient`, let `C
 - [Worker README](/Users/alperreha/Desktop/alper/workspace/ai/yula/apps/yula-worker/README.md)
 - [Core SDK README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-core/README.md)
 - [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-hono-stateless/README.md)
+- [Live weather MCP example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-live-weather/README.md)
 - [LangChain agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/README.md)

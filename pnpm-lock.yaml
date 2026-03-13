@@ -122,6 +122,28 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  examples/mcp-live-weather:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.7)
+      '@yula-xyz/core':
+        specifier: workspace:*
+        version: link:../../packages/yula-core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.15
+        version: 22.19.15
+      esbuild:
+        specifier: ^0.27.4
+        version: 0.27.4
+      tsx:
+        specifier: ^4.7.1
+        version: 4.21.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   packages/yula-core:
     dependencies:
       '@modelcontextprotocol/sdk':

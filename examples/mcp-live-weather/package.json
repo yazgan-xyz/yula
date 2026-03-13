@@ -1,0 +1,21 @@
+{
+  "name": "@yula-example/mcp-live-weather",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/dev.ts",
+    "build": "esbuild src/worker.ts --bundle --format=esm --target=esnext --platform=browser --outfile=dist/main.js",
+    "publish:local": "tsx src/publish-local.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@yula-xyz/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "esbuild": "^0.27.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}
