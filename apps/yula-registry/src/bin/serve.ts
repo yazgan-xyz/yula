@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { watch } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import path from "node:path";
 import {
@@ -65,6 +65,35 @@ async function main() {
   let restartQueued = false;
   let restartTimer: NodeJS.Timeout | undefined;
   const watchers: FSWatcher[] = [];
+  const envWatchers = new Map<string, FSWatcher>();
+
+  const syncEnvWatchers = (envFilePaths: string[]) => {
+    const nextPaths = new Set(
+      envFilePaths
+        .filter(Boolean)
+        .map((envFilePath) => path.resolve(envFilePath)),
+    );
+
+    for (const [envFilePath, watcher] of envWatchers) {
+      if (nextPaths.has(envFilePath)) {
+        continue;
+      }
+
+      watcher.close();
+      envWatchers.delete(envFilePath);
+    }
+
+    for (const envFilePath of nextPaths) {
+      if (envWatchers.has(envFilePath) || !existsSync(envFilePath)) {
+        continue;
+      }
+
+      const watcher = watch(envFilePath, () => {
+        scheduleRestart(`env file change: ${path.basename(envFilePath)}`);
+      });
+      envWatchers.set(envFilePath, watcher);
+    }
+  };
 
   const restart = async (reason: string) => {
     if (disposed) {
@@ -79,7 +108,12 @@ async function main() {
     restarting = true;
     try {
       console.log(`[registry] refreshing after ${reason}`);
-      await refreshRegistry(paths, { port });
+      const result = await refreshRegistry(paths, { port });
+      syncEnvWatchers(
+        result.definitions
+          .map((definition) => definition.envFilePath)
+          .filter((envFilePath): envFilePath is string => Boolean(envFilePath)),
+      );
       await stopChild(child);
       if (!disposed) {
         child = startWorkerd(paths);
@@ -104,7 +138,12 @@ async function main() {
   };
 
   await ensureRegistryLayout(paths);
-  await refreshRegistry(paths, { port });
+  const initialResult = await refreshRegistry(paths, { port });
+  syncEnvWatchers(
+    initialResult.definitions
+      .map((definition) => definition.envFilePath)
+      .filter((envFilePath): envFilePath is string => Boolean(envFilePath)),
+  );
   child = startWorkerd(paths);
 
   console.log(`[registry] app root: ${paths.appRoot}`);
@@ -134,6 +173,10 @@ async function main() {
     for (const watcher of watchers) {
       watcher.close();
     }
+    for (const watcher of envWatchers.values()) {
+      watcher.close();
+    }
+    envWatchers.clear();
 
     await stopChild(child);
   };

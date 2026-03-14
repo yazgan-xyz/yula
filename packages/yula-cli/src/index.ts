@@ -29,20 +29,26 @@ function printHelp() {
   console.log(`yula <command> [options]
 
 Commands:
-  yula create <file> --name <service-name> [--version 1.0.0]
-  yula deploy <file> --name <service-name> [--version 1.0.0]
-  yula pull <owner/name:version> --url <artifact.json>
+  yula create <file> --name <service-name> [--version 1.0.0] [--env .env]
+  yula deploy <file> --name <service-name> [--version 1.0.0] [--env .env]
+  yula pull <owner/name:version> --url <artifact.json> [--env .env]
   yula delete <route-or-alias>
   yula list
-  yula run <route> [--tool <tool-name>] [--input '{"key":"value"}']
+  yula run <route> [--tool <tool-name>] [--input '{"key":"value"}'] [--env .env]
 
 Examples:
-  yula create examples/mcp-live-weather/dist/main.js --name weather-live --version 1.0.0
-  yula pull alper/weather-live:1.0.0 --url https://example.com/weather-live.json
+  yula create examples/mcp-live-weather/dist/main.js --name weather-live --version 1.0.0 --env .env.weather
+  yula pull alper/weather-live:1.0.0 --url https://example.com/weather-live.json --env .env.weather
   yula list
   yula run weather-live-v1-0-0
-  yula run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}'
+  yula run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}' --env .env.weather
 `);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function getStringValue(values: ParsedValues, key: string) {
@@ -86,6 +92,7 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
     options: {
       name: { type: "string" },
       version: { type: "string" },
+      env: { type: "string" },
       registry: { type: "string" },
       alias: { type: "string" },
       "display-name": { type: "string" },
@@ -104,6 +111,7 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
     file,
     name: requireStringValue(values, "name"),
     version: getStringValue(values, "version"),
+    env: getStringValue(values, "env"),
     alias: getStringValue(values, "alias"),
     displayName: getStringValue(values, "display-name"),
     title: getStringValue(values, "title"),
@@ -120,6 +128,9 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
   if (definition.alias) {
     console.log(`[yula] alias: ${definition.alias}`);
   }
+  if (definition.envFilePath) {
+    console.log(`[yula] env file: ${definition.envFilePath}`);
+  }
   console.log(`[yula] registry state: ${paths.stateRoot}`);
   console.log(`[yula] sqlite: ${paths.dbPath}`);
   console.log(`[yula] runtime url: ${refreshed.baseUrl}/${definition.name}`);
@@ -134,6 +145,7 @@ async function handlePull(args: string[]) {
       port: { type: "string" },
       url: { type: "string" },
       file: { type: "string" },
+      env: { type: "string" },
       alias: { type: "string" },
       "display-name": { type: "string" },
       title: { type: "string" },
@@ -148,6 +160,7 @@ async function handlePull(args: string[]) {
     reference,
     url: getStringValue(values, "url"),
     file: getStringValue(values, "file"),
+    env: getStringValue(values, "env"),
     alias: getStringValue(values, "alias"),
     displayName: getStringValue(values, "display-name"),
     title: getStringValue(values, "title"),
@@ -167,6 +180,9 @@ async function handlePull(args: string[]) {
   }
   if (definition.remoteUrl) {
     console.log(`[yula] remote url: ${definition.remoteUrl}`);
+  }
+  if (definition.envFilePath) {
+    console.log(`[yula] env file: ${definition.envFilePath}`);
   }
   console.log(`[yula] sqlite: ${paths.dbPath}`);
   console.log(`[yula] runtime url: ${refreshed.baseUrl}/${definition.name}`);
@@ -221,6 +237,7 @@ async function handleList(args: string[]) {
         definition.displayName ? `display=${definition.displayName}` : null,
         definition.title ? `title=${definition.title}` : null,
         definition.alias ? `alias=${definition.alias}` : null,
+        definition.envFilePath ? `env=${definition.envFilePath}` : null,
         `source=${definition.sourceType}`,
         definition.sourceRef ? `ref=${definition.sourceRef}` : null,
         `${baseUrl}/${definition.name}`,
@@ -243,6 +260,7 @@ async function handleRun(args: string[]) {
       registry: { type: "string" },
       port: { type: "string" },
       host: { type: "string" },
+      env: { type: "string" },
     },
   });
   const selector = positionals[0];
@@ -254,7 +272,17 @@ async function handleRun(args: string[]) {
   const port = Number(getStringValue(values, "port") ?? "8080");
   const baseUrl = `http://${host}:${port}`;
   const paths = await resolveCliRegistryPaths(values);
-  const definition = await resolveRegistryDefinition(paths, selector);
+  const envFile = getStringValue(values, "env");
+  let definition = await resolveRegistryDefinition(paths, selector);
+  if (envFile) {
+    definition = await writeRegistryDefinition(paths, {
+      ...definition,
+      envFilePath: path.resolve(envFile),
+    });
+    await refreshRegistry(paths, { port });
+    console.log(`[yula] env file: ${definition.envFilePath}`);
+    await wait(750);
+  }
   const toolName = getStringValue(values, "tool");
   const explicitPath = getStringValue(values, "path");
   const method = (getStringValue(values, "method") ?? (toolName ? "POST" : "GET"))

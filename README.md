@@ -108,6 +108,17 @@ owner/package:version
 
 That maps well to future `yula login`, remote S3-backed artifact storage, and `yula pull` semantics similar to container registries.
 
+### 5. Attach a local env file to a worker
+
+If a worker needs secrets or connection strings, give it a local `.env` file when you deploy or run it:
+
+```bash
+node packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --env .env.postgres
+node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --input '{"sql":"select now()"}' --env .env.postgres
+```
+
+Yula stores the env file path in SQLite, parses the file during config generation, and writes each variable into the worker's `workerd` bindings. If `serve` is running, env file changes also trigger a restart so the new values are picked up automatically.
+
 ## Smoke tests
 
 ### Direct HTTP helper endpoint

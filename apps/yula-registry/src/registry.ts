@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { parseEnv } from "node:util";
 import { build } from "esbuild";
 import {
   createPublisherDefinition,
@@ -47,6 +48,7 @@ export const RegistryWorkerDefinitionSchema = z.object({
   packageName: z.string().min(1).max(120).optional(),
   version: z.string().min(1).max(120).optional(),
   remoteUrl: z.string().url().optional(),
+  envFilePath: z.string().min(1).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -112,6 +114,7 @@ export type CreateRegistryDefinitionOptions = {
   name?: string;
   version?: string;
   compatibilityDate?: string;
+  env?: string;
   alias?: string;
   displayName?: string;
   title?: string;
@@ -124,6 +127,7 @@ export type PullRegistryArtifactOptions = {
   file?: string;
   name?: string;
   version?: string;
+  env?: string;
   alias?: string;
   displayName?: string;
   title?: string;
@@ -145,6 +149,7 @@ type RegistryRow = {
   package_name: string | null;
   version: string | null;
   remote_url: string | null;
+  env_file_path: string | null;
   metadata_json: string | null;
   created_at: string;
   updated_at: string;
@@ -166,6 +171,7 @@ CREATE TABLE IF NOT EXISTS registry_workers (
   package_name TEXT,
   version TEXT,
   remote_url TEXT,
+  env_file_path TEXT,
   metadata_json TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -228,6 +234,13 @@ function getDefaultRegistryStateRoot() {
 function openRegistryDatabase(dbPath: string) {
   const database = new DatabaseSync(dbPath);
   database.exec(CREATE_WORKERS_TABLE_SQL);
+  const columns = database
+    .prepare("PRAGMA table_info(registry_workers)")
+    .all() as Array<{ name?: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+  if (!columnNames.has("env_file_path")) {
+    database.exec("ALTER TABLE registry_workers ADD COLUMN env_file_path TEXT;");
+  }
   return database;
 }
 
@@ -259,6 +272,7 @@ function rowToRegistryDefinition(row: RegistryRow): RegistryWorkerDefinition {
     packageName: row.package_name ?? undefined,
     version: row.version ?? undefined,
     remoteUrl: row.remote_url ?? undefined,
+    envFilePath: row.env_file_path ?? undefined,
     metadata: parseJsonColumn<Record<string, unknown> | undefined>(
       row.metadata_json,
       undefined,
@@ -296,10 +310,11 @@ function upsertDefinition(
         package_name,
         version,
         remote_url,
+        env_file_path,
         metadata_json,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       definition.name,
@@ -316,6 +331,7 @@ function upsertDefinition(
       definition.packageName ?? null,
       definition.version ?? null,
       definition.remoteUrl ?? null,
+      definition.envFilePath ?? null,
       definition.metadata ? JSON.stringify(definition.metadata) : null,
       createdAt,
       updatedAt,
@@ -434,6 +450,71 @@ function normalizeReferenceSegment(value: string) {
   return sanitizeWorkerNameSegment(value);
 }
 
+async function resolveEnvFilePath(envFile?: string) {
+  if (!envFile?.trim()) {
+    return undefined;
+  }
+
+  const resolvedPath = path.resolve(envFile.trim());
+  try {
+    await fs.access(resolvedPath);
+  } catch {
+    throw new Error(`Env file was not found: ${resolvedPath}`);
+  }
+
+  return resolvedPath;
+}
+
+function escapeCapnpString(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
+}
+
+function validateEnvBindingName(name: string, envFilePath: string) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(
+      `Env variable "${name}" in ${envFilePath} is not a valid workerd binding name.`,
+    );
+  }
+}
+
+async function loadEnvBindings(definition: RegistryWorkerDefinition) {
+  if (!definition.envFilePath) {
+    return [];
+  }
+
+  const envFilePath = path.resolve(definition.envFilePath);
+  const envSource = await fs.readFile(envFilePath, "utf8");
+  const parsed = parseEnv(envSource);
+
+  return Object.entries(parsed).map(([name, value]) => {
+    validateEnvBindingName(name, envFilePath);
+    return {
+      name,
+      value: value ?? "",
+    };
+  });
+}
+
+function renderWorkerBindings(bindings: Array<{ name: string; value: string }>) {
+  if (bindings.length === 0) {
+    return "";
+  }
+
+  const renderedBindings = bindings
+    .map(
+      ({ name, value }) =>
+        `      (name = "${escapeCapnpString(name)}", text = "${escapeCapnpString(value)}")`,
+    )
+    .join(",\n");
+
+  return `\n    bindings = [\n${renderedBindings}\n    ],`;
+}
+
 export function parseRegistryReference(reference: string): RegistryReference {
   const trimmed = reference.trim();
   const match = trimmed.match(
@@ -543,6 +624,7 @@ export async function listRegistryDefinitions(paths: RegistryPaths) {
           package_name,
           version,
           remote_url,
+          env_file_path,
           metadata_json,
           created_at,
           updated_at
@@ -621,6 +703,7 @@ export async function createRegistryDefinition(
   const inferredName = path.parse(filePath).name;
   const version = options.version ?? "1.0.0";
   const packageName = sanitizeWorkerNameSegment(options.name ?? inferredName);
+  const envFilePath = await resolveEnvFilePath(options.env);
   const publishedDefinition = createPublisherDefinition({
     name: packageName,
     version,
@@ -639,6 +722,7 @@ export async function createRegistryDefinition(
     sourceType: "local",
     packageName,
     version,
+    envFilePath,
   });
 }
 
@@ -657,6 +741,7 @@ export async function pullRegistryArtifact(options: PullRegistryArtifactOptions)
   const version =
     options.version ?? artifact.version ?? reference?.version ?? "1.0.0";
   const owner = artifact.owner ?? reference?.owner;
+  const envFilePath = await resolveEnvFilePath(options.env);
   const sourceRef =
     reference?.sourceRef ??
     (owner
@@ -691,6 +776,7 @@ export async function pullRegistryArtifact(options: PullRegistryArtifactOptions)
     packageName,
     version,
     remoteUrl: options.url ?? artifact.remoteUrl,
+    envFilePath,
     metadata: {
       ...(artifact.metadata ?? {}),
       pulledFromFile: options.file ? path.resolve(options.file) : undefined,
@@ -717,6 +803,7 @@ export async function refreshRegistry(
 
   for (const definition of definitions) {
     const workerIdentifier = toCapnpIdentifier(definition.name, usedIdentifiers);
+    const envBindings = await loadEnvBindings(definition);
     await fs.writeFile(
       path.join(paths.configDir, `${definition.name}.js`),
       definition.module,
@@ -726,7 +813,7 @@ export async function refreshRegistry(
     capnp += `
 const ${workerIdentifier} :Workerd.Worker = (
     compatibilityDate = "${definition.compatibilityDate || "2023-02-28"}",
-    modules = [(name = "${definition.name}.js", esModule = embed "${definition.name}.js")],
+    modules = [(name = "${definition.name}.js", esModule = embed "${definition.name}.js")],${renderWorkerBindings(envBindings)}
 );`;
 
     capnp = insertIntoCapnpList(

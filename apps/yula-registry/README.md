@@ -9,6 +9,7 @@ It merges the old publisher + worker responsibilities into one place:
 - `data/` is only kept as a legacy import path for older JSON-based entries
 - `pnpm --filter @yula-xyz/registry refresh` regenerates the runtime config
 - `pnpm --filter @yula-xyz/registry serve` watches for changes and restarts workerd automatically
+- worker-specific `.env` files are parsed and written into `workerd` as text bindings
 
 Default local state root:
 
@@ -33,5 +34,14 @@ node packages/yula-cli/bin/yula.js pull demo/shared-math:2.0.0 --file /tmp/share
 node packages/yula-cli/bin/yula.js list
 node packages/yula-cli/bin/yula.js run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}'
 ```
+
+Env-backed worker example:
+
+```bash
+node packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --env .env.postgres
+node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --input '{"sql":"select now()"}'
+```
+
+If `.env.postgres` changes while `serve` is running, Yula watches that file and restarts `workerd` so the worker sees the new values.
 
 The matching CLI lives in [packages/yula-cli](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-cli/README.md).
