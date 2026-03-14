@@ -1,6 +1,8 @@
-import { build } from "esbuild";
+import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+import { build } from "esbuild";
 import {
   createPublisherDefinition,
   sanitizeWorkerNameSegment,
@@ -9,14 +11,17 @@ import {
 import { z } from "zod";
 
 const DEFAULT_REGISTRY_APP_NAME = "@yula-xyz/registry";
-const DEFAULT_REGISTRY_FALLBACK_DIR = ".yula/registry";
 const DEFAULT_PORT = 8080;
+const DEFAULT_SQLITE_FILE_NAME = "registry.sqlite";
+const DEFAULT_STATE_DIR_NAME = ".yula/registry";
 const GENERATED_KEEP_FILES = new Set([
   ".gitignore",
   "_router.js",
   "_meta.json",
   "config.capnp",
 ]);
+
+const RegistrySourceTypeSchema = z.enum(["local", "pulled"]);
 
 export const RegistryWorkerDefinitionSchema = z.object({
   name: z
@@ -25,7 +30,7 @@ export const RegistryWorkerDefinitionSchema = z.object({
     .max(64)
     .regex(/^[a-z0-9-_]+$/),
   module: z.string().min(1),
-  flags: z.array(z.string().min(1)).optional(),
+  flags: z.array(z.string().min(1)).default([]),
   compatibilityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   alias: z
     .string()
@@ -34,16 +39,58 @@ export const RegistryWorkerDefinitionSchema = z.object({
     .regex(/^[a-z0-9-_]+$/)
     .optional(),
   displayName: z.string().min(1).max(120).optional(),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().min(1).max(4_000).optional(),
+  sourceType: RegistrySourceTypeSchema.default("local"),
+  sourceRef: z.string().min(1).max(200).optional(),
+  owner: z.string().min(1).max(120).optional(),
+  packageName: z.string().min(1).max(120).optional(),
+  version: z.string().min(1).max(120).optional(),
+  remoteUrl: z.string().url().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export const RegistryPulledArtifactSchema = z.object({
+  name: z.string().min(1).optional(),
+  packageName: z.string().min(1).optional(),
+  version: z.string().min(1).optional(),
+  owner: z.string().min(1).optional(),
+  module: z.string().min(1),
+  compatibilityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  flags: z.array(z.string().min(1)).default([]),
+  alias: z
+    .string()
+    .min(2)
+    .max(64)
+    .regex(/^[a-z0-9-_]+$/)
+    .optional(),
+  displayName: z.string().min(1).max(120).optional(),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().min(1).max(4_000).optional(),
+  remoteUrl: z.string().url().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type RegistryWorkerDefinition = z.infer<
   typeof RegistryWorkerDefinitionSchema
 >;
 
+export type RegistryPulledArtifact = z.infer<typeof RegistryPulledArtifactSchema>;
+
+export type RegistryReference = {
+  owner?: string;
+  packageName: string;
+  version?: string;
+  sourceRef: string;
+};
+
 export type RegistryPaths = {
-  root: string;
-  dataDir: string;
+  appRoot: string;
+  stateRoot: string;
   configDir: string;
+  dbPath: string;
   routerEntry: string;
   templatePath: string;
 };
@@ -62,7 +109,65 @@ export type CreateRegistryDefinitionOptions = {
   compatibilityDate?: string;
   alias?: string;
   displayName?: string;
+  title?: string;
+  description?: string;
 };
+
+export type PullRegistryArtifactOptions = {
+  reference?: string;
+  url?: string;
+  file?: string;
+  name?: string;
+  version?: string;
+  alias?: string;
+  displayName?: string;
+  title?: string;
+  description?: string;
+};
+
+type RegistryRow = {
+  name: string;
+  module: string;
+  compatibility_date: string | null;
+  flags_json: string | null;
+  alias: string | null;
+  display_name: string | null;
+  title: string | null;
+  description: string | null;
+  source_type: string;
+  source_ref: string | null;
+  owner: string | null;
+  package_name: string | null;
+  version: string | null;
+  remote_url: string | null;
+  metadata_json: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const CREATE_WORKERS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS registry_workers (
+  name TEXT PRIMARY KEY,
+  module TEXT NOT NULL,
+  compatibility_date TEXT,
+  flags_json TEXT NOT NULL DEFAULT '[]',
+  alias TEXT UNIQUE,
+  display_name TEXT,
+  title TEXT,
+  description TEXT,
+  source_type TEXT NOT NULL DEFAULT 'local',
+  source_ref TEXT,
+  owner TEXT,
+  package_name TEXT,
+  version TEXT,
+  remote_url TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_registry_workers_alias ON registry_workers(alias);
+CREATE INDEX IF NOT EXISTS idx_registry_workers_source_ref ON registry_workers(source_ref);
+`;
 
 async function pathExists(targetPath: string) {
   try {
@@ -77,7 +182,7 @@ async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(await fs.readFile(filePath, "utf8")) as T;
 }
 
-async function findRegistryRootFrom(startDir: string) {
+async function findRegistryAppRootFrom(startDir: string) {
   let currentDir = path.resolve(startDir);
 
   while (true) {
@@ -106,7 +211,145 @@ async function findRegistryRootFrom(startDir: string) {
     currentDir = parentDir;
   }
 
-  return path.resolve(startDir, DEFAULT_REGISTRY_FALLBACK_DIR);
+  throw new Error(
+    'Unable to locate the "@yula-xyz/registry" app from the current workspace.',
+  );
+}
+
+function getDefaultRegistryStateRoot() {
+  return path.join(os.homedir(), DEFAULT_STATE_DIR_NAME);
+}
+
+function openRegistryDatabase(dbPath: string) {
+  const database = new DatabaseSync(dbPath);
+  database.exec(CREATE_WORKERS_TABLE_SQL);
+  return database;
+}
+
+function parseJsonColumn<T>(value: string | null, fallback: T): T {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function rowToRegistryDefinition(row: RegistryRow): RegistryWorkerDefinition {
+  return RegistryWorkerDefinitionSchema.parse({
+    name: row.name,
+    module: row.module,
+    compatibilityDate: row.compatibility_date ?? undefined,
+    flags: parseJsonColumn<string[]>(row.flags_json, []),
+    alias: row.alias ?? undefined,
+    displayName: row.display_name ?? undefined,
+    title: row.title ?? undefined,
+    description: row.description ?? undefined,
+    sourceType: row.source_type,
+    sourceRef: row.source_ref ?? undefined,
+    owner: row.owner ?? undefined,
+    packageName: row.package_name ?? undefined,
+    version: row.version ?? undefined,
+    remoteUrl: row.remote_url ?? undefined,
+    metadata: parseJsonColumn<Record<string, unknown> | undefined>(
+      row.metadata_json,
+      undefined,
+    ),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+function upsertDefinition(
+  database: DatabaseSync,
+  definition: RegistryWorkerDefinition,
+) {
+  const now = new Date().toISOString();
+  const existing = database
+    .prepare("SELECT created_at FROM registry_workers WHERE name = ?")
+    .get(definition.name) as { created_at?: string } | undefined;
+  const createdAt = definition.createdAt ?? existing?.created_at ?? now;
+  const updatedAt = now;
+
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO registry_workers (
+        name,
+        module,
+        compatibility_date,
+        flags_json,
+        alias,
+        display_name,
+        title,
+        description,
+        source_type,
+        source_ref,
+        owner,
+        package_name,
+        version,
+        remote_url,
+        metadata_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      definition.name,
+      definition.module,
+      definition.compatibilityDate ?? null,
+      JSON.stringify(definition.flags ?? []),
+      definition.alias ?? null,
+      definition.displayName ?? null,
+      definition.title ?? null,
+      definition.description ?? null,
+      definition.sourceType,
+      definition.sourceRef ?? null,
+      definition.owner ?? null,
+      definition.packageName ?? null,
+      definition.version ?? null,
+      definition.remoteUrl ?? null,
+      definition.metadata ? JSON.stringify(definition.metadata) : null,
+      createdAt,
+      updatedAt,
+    );
+
+  return RegistryWorkerDefinitionSchema.parse({
+    ...definition,
+    createdAt,
+    updatedAt,
+  });
+}
+
+async function maybeMigrateLegacyFileDefinitions(
+  paths: RegistryPaths,
+  database: DatabaseSync,
+) {
+  const legacyDataDir = path.join(paths.stateRoot, "data");
+  if (!(await pathExists(legacyDataDir))) {
+    return;
+  }
+
+  const countRow = database
+    .prepare("SELECT COUNT(*) AS count FROM registry_workers")
+    .get() as { count?: number };
+  if ((countRow.count ?? 0) > 0) {
+    return;
+  }
+
+  for (const fileName of await fs.readdir(legacyDataDir)) {
+    if (!fileName.endsWith(".json")) {
+      continue;
+    }
+
+    const rawDefinition = await readJson<unknown>(
+      path.join(legacyDataDir, fileName),
+    );
+    const definition = RegistryWorkerDefinitionSchema.parse(rawDefinition);
+    upsertDefinition(database, definition);
+  }
 }
 
 function toCapnpIdentifier(name: string, usedIdentifiers: Set<string>) {
@@ -182,48 +425,151 @@ async function bundleRouter(paths: RegistryPaths) {
   });
 }
 
+function normalizeReferenceSegment(value: string) {
+  return sanitizeWorkerNameSegment(value);
+}
+
+export function parseRegistryReference(reference: string): RegistryReference {
+  const trimmed = reference.trim();
+  const match = trimmed.match(
+    /^(?:(?<owner>[a-zA-Z0-9][a-zA-Z0-9-_]*)\/)?(?<packageName>[a-zA-Z0-9][a-zA-Z0-9-_]*)(?::(?<version>[a-zA-Z0-9][a-zA-Z0-9._-]*))?$/,
+  );
+
+  if (!match?.groups?.packageName) {
+    throw new Error(
+      `Invalid registry reference "${reference}". Expected "owner/name:version" or "name:version".`,
+    );
+  }
+
+  const owner = match.groups.owner
+    ? normalizeReferenceSegment(match.groups.owner)
+    : undefined;
+  const packageName = normalizeReferenceSegment(match.groups.packageName);
+  const version = match.groups.version?.trim() || undefined;
+  const sourceRef = owner
+    ? `${owner}/${packageName}${version ? `:${version}` : ""}`
+    : `${packageName}${version ? `:${version}` : ""}`;
+
+  return {
+    owner,
+    packageName,
+    version,
+    sourceRef,
+  };
+}
+
+async function loadPulledArtifact(
+  options: PullRegistryArtifactOptions,
+): Promise<RegistryPulledArtifact> {
+  if (!options.url && !options.file) {
+    throw new Error(
+      '"yula pull" currently needs either "--url <artifact-json>" or "--file <artifact-json>".',
+    );
+  }
+
+  let rawArtifact: unknown;
+  if (options.url) {
+    const response = await fetch(options.url);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to pull artifact from ${options.url}: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    rawArtifact = await response.json();
+  } else {
+    rawArtifact = await readJson<unknown>(path.resolve(options.file!));
+  }
+
+  return RegistryPulledArtifactSchema.parse(rawArtifact);
+}
+
 export function getRegistryBaseUrl(port = DEFAULT_PORT) {
   return `http://127.0.0.1:${port}`;
 }
 
 export async function resolveRegistryPaths(
-  explicitRoot?: string,
+  explicitStateRoot?: string,
   startDir = process.cwd(),
 ): Promise<RegistryPaths> {
-  const root = explicitRoot
-    ? path.resolve(explicitRoot)
-    : await findRegistryRootFrom(startDir);
+  const appRoot = await findRegistryAppRootFrom(startDir);
+  const resolutionBase = process.env.INIT_CWD
+    ? path.resolve(process.env.INIT_CWD)
+    : path.resolve(startDir);
+  const stateRoot = explicitStateRoot
+    ? path.resolve(resolutionBase, explicitStateRoot)
+    : getDefaultRegistryStateRoot();
 
   return {
-    root,
-    dataDir: path.join(root, "data"),
-    configDir: path.join(root, "config"),
-    routerEntry: path.join(root, "src", "router.ts"),
-    templatePath: path.join(root, "config.template.capnp"),
+    appRoot,
+    stateRoot,
+    configDir: path.join(stateRoot, "config"),
+    dbPath: path.join(stateRoot, DEFAULT_SQLITE_FILE_NAME),
+    routerEntry: path.join(appRoot, "src", "router.ts"),
+    templatePath: path.join(appRoot, "config.template.capnp"),
   };
 }
 
 export async function ensureRegistryLayout(paths: RegistryPaths) {
-  await fs.mkdir(paths.dataDir, { recursive: true });
+  await fs.mkdir(paths.stateRoot, { recursive: true });
   await fs.mkdir(paths.configDir, { recursive: true });
 }
 
 export async function listRegistryDefinitions(paths: RegistryPaths) {
   await ensureRegistryLayout(paths);
+  const database = openRegistryDatabase(paths.dbPath);
+  try {
+    await maybeMigrateLegacyFileDefinitions(paths, database);
+    const rows = database
+      .prepare(
+        `SELECT
+          name,
+          module,
+          compatibility_date,
+          flags_json,
+          alias,
+          display_name,
+          title,
+          description,
+          source_type,
+          source_ref,
+          owner,
+          package_name,
+          version,
+          remote_url,
+          metadata_json,
+          created_at,
+          updated_at
+        FROM registry_workers
+        ORDER BY name ASC`,
+      )
+      .all() as RegistryRow[];
 
-  const definitions: RegistryWorkerDefinition[] = [];
-  for (const fileName of await fs.readdir(paths.dataDir)) {
-    if (!fileName.endsWith(".json")) {
-      continue;
-    }
+    return rows.map(rowToRegistryDefinition);
+  } finally {
+    database.close();
+  }
+}
 
-    const filePath = path.join(paths.dataDir, fileName);
-    const rawDefinition = await readJson<unknown>(filePath);
-    const definition = RegistryWorkerDefinitionSchema.parse(rawDefinition);
-    definitions.push(definition);
+export async function resolveRegistryDefinition(
+  paths: RegistryPaths,
+  nameOrAliasOrReference: string,
+) {
+  const definitions = await listRegistryDefinitions(paths);
+  const candidate = definitions.find(
+    (definition) =>
+      definition.name === nameOrAliasOrReference ||
+      definition.alias === nameOrAliasOrReference ||
+      definition.sourceRef === nameOrAliasOrReference,
+  );
+
+  if (!candidate) {
+    throw new Error(
+      `Registry worker "${nameOrAliasOrReference}" was not found in SQLite registry ${paths.dbPath}.`,
+    );
   }
 
-  return definitions.sort((left, right) => left.name.localeCompare(right.name));
+  return candidate;
 }
 
 export async function writeRegistryDefinition(
@@ -231,35 +577,34 @@ export async function writeRegistryDefinition(
   definition: RegistryWorkerDefinition | YulaPublisherWorkerDefinition,
 ) {
   await ensureRegistryLayout(paths);
-  const normalized = RegistryWorkerDefinitionSchema.parse(definition);
-  await fs.writeFile(
-    path.join(paths.dataDir, `${normalized.name}.json`),
-    `${JSON.stringify(normalized, null, 2)}\n`,
-    "utf8",
-  );
-
-  return normalized;
+  const candidate = definition as Partial<RegistryWorkerDefinition>;
+  const normalized = RegistryWorkerDefinitionSchema.parse({
+    ...candidate,
+    sourceType: candidate.sourceType ?? "local",
+  });
+  const database = openRegistryDatabase(paths.dbPath);
+  try {
+    return upsertDefinition(database, normalized);
+  } finally {
+    database.close();
+  }
 }
 
 export async function deleteRegistryDefinition(
   paths: RegistryPaths,
-  nameOrAlias: string,
+  nameOrAliasOrReference: string,
 ) {
-  const definitions = await listRegistryDefinitions(paths);
-  const definition = definitions.find(
-    (candidate) =>
-      candidate.name === nameOrAlias || candidate.alias === nameOrAlias,
-  );
-
-  if (!definition) {
-    throw new Error(`Registry worker "${nameOrAlias}" was not found.`);
+  await ensureRegistryLayout(paths);
+  const definition = await resolveRegistryDefinition(paths, nameOrAliasOrReference);
+  const database = openRegistryDatabase(paths.dbPath);
+  try {
+    database
+      .prepare("DELETE FROM registry_workers WHERE name = ?")
+      .run(definition.name);
+    return definition;
+  } finally {
+    database.close();
   }
-
-  await fs.rm(path.join(paths.dataDir, `${definition.name}.json`), {
-    force: true,
-  });
-
-  return definition;
 }
 
 export async function createRegistryDefinition(
@@ -268,9 +613,11 @@ export async function createRegistryDefinition(
   const filePath = path.resolve(options.file);
   const moduleSource = await fs.readFile(filePath, "utf8");
   const inferredName = path.parse(filePath).name;
+  const version = options.version ?? "1.0.0";
+  const packageName = sanitizeWorkerNameSegment(options.name ?? inferredName);
   const publishedDefinition = createPublisherDefinition({
-    name: options.name ?? inferredName,
-    version: options.version ?? "1.0.0",
+    name: packageName,
+    version,
     module: moduleSource,
     compatibilityDate: options.compatibilityDate ?? "2023-02-28",
   });
@@ -281,6 +628,67 @@ export async function createRegistryDefinition(
       ? sanitizeWorkerNameSegment(options.alias)
       : undefined,
     displayName: options.displayName?.trim() || undefined,
+    title: options.title?.trim() || options.displayName?.trim() || undefined,
+    description: options.description?.trim() || undefined,
+    sourceType: "local",
+    packageName,
+    version,
+  });
+}
+
+export async function pullRegistryArtifact(options: PullRegistryArtifactOptions) {
+  const artifact = await loadPulledArtifact(options);
+  const reference = options.reference
+    ? parseRegistryReference(options.reference)
+    : undefined;
+  const packageName = sanitizeWorkerNameSegment(
+    options.name ??
+      artifact.packageName ??
+      artifact.name ??
+      reference?.packageName ??
+      "worker",
+  );
+  const version =
+    options.version ?? artifact.version ?? reference?.version ?? "1.0.0";
+  const owner = artifact.owner ?? reference?.owner;
+  const sourceRef =
+    reference?.sourceRef ??
+    (owner
+      ? `${owner}/${packageName}:${version}`
+      : `${packageName}:${version}`);
+  const publishedDefinition = createPublisherDefinition({
+    name: packageName,
+    version,
+    module: artifact.module,
+    compatibilityDate: artifact.compatibilityDate ?? "2023-02-28",
+  });
+
+  return RegistryWorkerDefinitionSchema.parse({
+    ...publishedDefinition,
+    flags: artifact.flags,
+    compatibilityDate: artifact.compatibilityDate ?? "2023-02-28",
+    alias: options.alias
+      ? sanitizeWorkerNameSegment(options.alias)
+      : artifact.alias,
+    displayName:
+      options.displayName?.trim() ||
+      artifact.displayName?.trim() ||
+      artifact.title?.trim() ||
+      undefined,
+    title:
+      options.title?.trim() || artifact.title?.trim() || artifact.displayName,
+    description:
+      options.description?.trim() || artifact.description?.trim() || undefined,
+    sourceType: "pulled",
+    sourceRef,
+    owner,
+    packageName,
+    version,
+    remoteUrl: options.url ?? artifact.remoteUrl,
+    metadata: {
+      ...(artifact.metadata ?? {}),
+      pulledFromFile: options.file ? path.resolve(options.file) : undefined,
+    },
   });
 }
 

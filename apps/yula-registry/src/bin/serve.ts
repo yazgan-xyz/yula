@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
 import { watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
+import path from "node:path";
 import {
+  ensureRegistryLayout,
   refreshRegistry,
   resolveRegistryPaths,
   type RegistryPaths,
@@ -35,11 +37,20 @@ async function stopChild(
 
 function startWorkerd(paths: RegistryPaths) {
   console.log("[registry] starting workerd...");
-  return spawn("pnpm", ["workerd", "serve", "config/config.capnp", "--verbose"], {
-    cwd: paths.root,
-    stdio: "inherit",
-    env: process.env,
-  });
+  return spawn(
+    "pnpm",
+    [
+      "workerd",
+      "serve",
+      path.join(paths.configDir, "config.capnp"),
+      "--verbose",
+    ],
+    {
+      cwd: paths.appRoot,
+      stdio: "inherit",
+      env: process.env,
+    },
+  );
 }
 
 async function main() {
@@ -89,11 +100,20 @@ async function main() {
     }, 250);
   };
 
+  await ensureRegistryLayout(paths);
   await refreshRegistry(paths, { port });
   child = startWorkerd(paths);
 
+  console.log(`[registry] app root: ${paths.appRoot}`);
+  console.log(`[registry] state root: ${paths.stateRoot}`);
+  console.log(`[registry] sqlite: ${paths.dbPath}`);
+
   watchers.push(
-    watch(paths.dataDir, () => scheduleRestart("registry data change")),
+    watch(paths.stateRoot, (_eventType, filename) => {
+      if (!filename || filename.toString() === path.basename(paths.dbPath)) {
+        scheduleRestart("registry sqlite change");
+      }
+    }),
     watch(paths.routerEntry, () => scheduleRestart("router change")),
     watch(paths.templatePath, () => scheduleRestart("config template change")),
   );

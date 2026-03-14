@@ -68,9 +68,9 @@ The SDK is aware of that route shape and correctly handles:
 - MCP JSON-RPC requests under the prefixed path
 - helper endpoints such as `/tools`, `/docs`, and `/openapi.json`
 
-## Publisher helper
+## Route helper
 
-Use `createPublisherDefinition()` when you want a stable publish payload for `apps/yula-publisher`:
+Use `createPublisherDefinition()` when you want a stable Yula route payload for the registry or for future remote artifact manifests:
 
 ```ts
 import { createPublisherDefinition } from "@yula-xyz/core";
@@ -87,4 +87,4 @@ That generates a Yula-safe route name like `math-mcp-v1-0-0`.
 
 ## Full example
 
-See the runnable demo worker at [examples/mcp-hono-stateless](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-hono-stateless/README.md).
+See the runnable demo worker at [examples/math-mcp](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/math-mcp/README.md).

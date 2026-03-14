@@ -17,7 +17,7 @@ Before running this example:
 
 - your local Ollama server should be running
 - the model you want to use should already be pulled in Ollama
-- the local Yula MCP demo should already be up
+- the local Yula registry runtime should already be up with a deployed MCP worker
 
 Examples:
 
@@ -25,6 +25,9 @@ Examples:
 ollama serve
 ollama list
 ollama pull llama3.1
+pnpm --filter @yula-xyz/registry serve
+pnpm --filter @yula-example/math-mcp build
+pnpm --filter @yula-example/math-mcp deploy:registry
 ```
 
 ## Environment

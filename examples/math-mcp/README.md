@@ -1,8 +1,8 @@
-# MCP worker example
+# Math MCP example
 
 This example is a runnable MCP server built with `@yula-xyz/core`.
 
-It is intentionally simple: it exposes deterministic math tools so you can verify the whole Yula publish -> sync -> serve -> agent call chain.
+It is intentionally simple: it exposes deterministic math tools so you can verify the whole Yula build -> deploy -> run -> agent call chain.
 
 ## Tools
 
@@ -15,7 +15,7 @@ It is intentionally simple: it exposes deterministic math tools so you can verif
 If you only want to develop the worker itself without publishing into Yula:
 
 ```bash
-pnpm --filter @yula-example/mcp-hono-stateless dev
+pnpm --filter @yula-example/math-mcp dev
 ```
 
 Standalone endpoint:
@@ -31,58 +31,53 @@ Useful local routes:
 - `GET /mcp/openapi.json`
 - `POST /mcp/tools/add`
 
-## Publish into Yula
+## Deploy into Yula Registry
 
 ### 1. Build the worker bundle
 
 ```bash
-pnpm --filter @yula-example/mcp-hono-stateless build
+pnpm --filter @yula-example/math-mcp build
 ```
 
 This creates:
 
 ```text
-examples/mcp-hono-stateless/dist/main.js
+examples/math-mcp/dist/main.js
 ```
 
-### 2. Publish to the local publisher
+### 2. Start the local registry runtime
 
-Make sure `apps/yula-publisher` is already running, then:
+Make sure the local registry runtime is running:
 
 ```bash
-pnpm --filter @yula-example/mcp-hono-stateless publish:local
+pnpm --filter @yula-xyz/registry serve
 ```
 
-Default publish values:
+Then deploy the worker:
+
+```bash
+pnpm --filter @yula-example/math-mcp deploy:registry
+```
+
+Default deploy values:
 
 - worker name: `math-mcp`
 - worker version: `1.0.0`
-- published route name: `math-mcp-v1-0-0`
+- route name: `math-mcp-v1-0-0`
 
 ## Full demo with Yula
 
 ### Terminal 1
 
 ```bash
-pnpm --filter @yula-xyz/publisher build
-cd apps/yula-publisher
-node dist/index.js
+pnpm --filter @yula-xyz/registry serve
 ```
 
 ### Terminal 2
 
 ```bash
-pnpm --filter @yula-example/mcp-hono-stateless build
-pnpm --filter @yula-example/mcp-hono-stateless publish:local
-```
-
-### Terminal 3
-
-```bash
-pnpm --filter @yula-xyz/worker build
-cd apps/yula-worker
-pnpm sync
-pnpm serve
+pnpm --filter @yula-example/math-mcp build
+pnpm --filter @yula-example/math-mcp deploy:registry
 ```
 
 Final MCP URL:
@@ -92,6 +87,12 @@ http://localhost:8080/math-mcp-v1-0-0/mcp
 ```
 
 ## Smoke tests
+
+CLI tool list:
+
+```bash
+node packages/yula-cli/bin/yula.js run math-mcp-v1-0-0
+```
 
 Direct helper endpoint:
 

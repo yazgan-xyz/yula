@@ -11,7 +11,7 @@ serve(
     port,
   },
   (info) => {
-    console.log(`Example MCP worker listening on http://localhost:${info.port}`);
+    console.log(`Math MCP example listening on http://localhost:${info.port}`);
     console.log(`Docs: http://localhost:${info.port}/mcp/docs`);
   },
 );

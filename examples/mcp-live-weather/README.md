@@ -35,7 +35,7 @@ Standalone endpoint:
 http://localhost:8791/mcp
 ```
 
-## Publish into Yula
+## Deploy into Yula Registry
 
 ### 1. Build
 
@@ -43,12 +43,16 @@ http://localhost:8791/mcp
 pnpm --filter @yula-example/mcp-live-weather build
 ```
 
-### 2. Publish
-
-Make sure `apps/yula-publisher` is running, then:
+### 2. Start the registry runtime
 
 ```bash
-pnpm --filter @yula-example/mcp-live-weather publish:local
+pnpm --filter @yula-xyz/registry serve
+```
+
+### 3. Deploy
+
+```bash
+pnpm --filter @yula-example/mcp-live-weather deploy:registry
 ```
 
 Default published route:
@@ -63,7 +67,7 @@ Final MCP URL through Yula:
 http://localhost:8080/weather-live-v1-0-0/mcp
 ```
 
-## Direct test after publish + sync + serve
+## Direct test after deploy
 
 ```bash
 curl -X POST http://127.0.0.1:8080/weather-live-v1-0-0/mcp/tools/current-weather \

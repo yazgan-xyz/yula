@@ -12,11 +12,13 @@ If you want the same flow with a local model instead, use the sibling Ollama exa
 
 ## Prerequisites
 
-Before running this example, the local Yula demo stack should already be up:
+Before running this example, the local Yula registry runtime should already be up and serving an MCP worker:
 
-- `yula-publisher` running on `http://localhost:8086`
-- the example MCP worker published as `math-mcp-v1-0-0`
-- `yula-worker` serving on `http://localhost:8080`
+```bash
+pnpm --filter @yula-xyz/registry serve
+pnpm --filter @yula-example/math-mcp build
+pnpm --filter @yula-example/math-mcp deploy:registry
+```
 
 Target MCP URL:
 
@@ -28,6 +30,13 @@ You can also point the same agent to the live weather example:
 
 ```text
 http://localhost:8080/weather-live-v1-0-0/mcp
+```
+
+To deploy that worker:
+
+```bash
+pnpm --filter @yula-example/mcp-live-weather build
+pnpm --filter @yula-example/mcp-live-weather deploy:registry
 ```
 
 ## Environment
@@ -83,4 +92,4 @@ pnpm --filter @yula-example/langchain-openai-agent start -- "Istanbul icin gunce
 ## Related files
 
 - Agent entry: [src/index.ts](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/src/index.ts)
-- MCP worker example: [examples/mcp-hono-stateless](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-hono-stateless/README.md)
+- MCP worker example: [examples/math-mcp](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/math-mcp/README.md)

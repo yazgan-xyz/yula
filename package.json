@@ -28,9 +28,8 @@
     "dev:all": "pnpm --filter @yula-xyz/* dev",
     "registry": "pnpm --filter @yula-xyz/registry",
     "cli": "pnpm --filter @yula-xyz/cli",
-    "worker": "pnpm --filter @yula-xyz/worker",
-    "publisher": "pnpm --filter @yula-xyz/publisher",
-    "example-hono": "pnpm --filter @yula-example/mcp-hono-stateless",
+    "yula": "node packages/yula-cli/bin/yula.js",
+    "example-math": "pnpm --filter @yula-example/math-mcp",
     "example-agent": "pnpm --filter @yula-example/langchain-openai-agent",
     "example-weather": "pnpm --filter @yula-example/mcp-live-weather",
     "example-ollama": "pnpm --filter @yula-example/langchain-ollama-agent"

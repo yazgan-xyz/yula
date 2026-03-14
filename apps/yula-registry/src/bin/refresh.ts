@@ -9,7 +9,9 @@ async function main() {
   const paths = await resolveRegistryPaths(process.env.YULA_REGISTRY_ROOT);
   const result = await refreshRegistry(paths, { port });
 
-  console.log(`[registry] root: ${paths.root}`);
+  console.log(`[registry] app root: ${paths.appRoot}`);
+  console.log(`[registry] state root: ${paths.stateRoot}`);
+  console.log(`[registry] sqlite: ${paths.dbPath}`);
   console.log(`[registry] runtime url: ${getRegistryBaseUrl(port)}`);
   console.log(
     `[registry] routes: ${result.routes.length ? result.routes.join(", ") : "(none)"}`,

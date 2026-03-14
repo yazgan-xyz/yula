@@ -5,7 +5,9 @@ import {
   deleteRegistryDefinition,
   getRegistryBaseUrl,
   listRegistryDefinitions,
+  pullRegistryArtifact,
   refreshRegistry,
+  resolveRegistryDefinition,
   resolveRegistryPaths,
   writeRegistryDefinition,
 } from "@yula-xyz/registry";
@@ -18,12 +20,14 @@ function printHelp() {
 Commands:
   yula create <file> --name <service-name> [--version 1.0.0]
   yula deploy <file> --name <service-name> [--version 1.0.0]
+  yula pull <owner/name:version> --url <artifact.json>
   yula delete <route-or-alias>
   yula list
   yula run <route> [--tool <tool-name>] [--input '{"key":"value"}']
 
 Examples:
   yula create examples/mcp-live-weather/dist/main.js --name weather-live --version 1.0.0
+  yula pull alper/weather-live:1.0.0 --url https://example.com/weather-live.json
   yula list
   yula run weather-live-v1-0-0
   yula run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}'
@@ -74,6 +78,8 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
       registry: { type: "string" },
       alias: { type: "string" },
       "display-name": { type: "string" },
+      title: { type: "string" },
+      description: { type: "string" },
       "compatibility-date": { type: "string" },
       port: { type: "string" },
     },
@@ -89,6 +95,8 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
     version: getStringValue(values, "version"),
     alias: getStringValue(values, "alias"),
     displayName: getStringValue(values, "display-name"),
+    title: getStringValue(values, "title"),
+    description: getStringValue(values, "description"),
     compatibilityDate: getStringValue(values, "compatibility-date"),
   });
   const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
@@ -101,7 +109,55 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
   if (definition.alias) {
     console.log(`[yula] alias: ${definition.alias}`);
   }
-  console.log(`[yula] registry root: ${paths.root}`);
+  console.log(`[yula] registry state: ${paths.stateRoot}`);
+  console.log(`[yula] sqlite: ${paths.dbPath}`);
+  console.log(`[yula] runtime url: ${refreshed.baseUrl}/${definition.name}`);
+}
+
+async function handlePull(args: string[]) {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      registry: { type: "string" },
+      port: { type: "string" },
+      url: { type: "string" },
+      file: { type: "string" },
+      alias: { type: "string" },
+      "display-name": { type: "string" },
+      title: { type: "string" },
+      description: { type: "string" },
+      name: { type: "string" },
+      version: { type: "string" },
+    },
+  });
+
+  const reference = positionals[0];
+  const definition = await pullRegistryArtifact({
+    reference,
+    url: getStringValue(values, "url"),
+    file: getStringValue(values, "file"),
+    alias: getStringValue(values, "alias"),
+    displayName: getStringValue(values, "display-name"),
+    title: getStringValue(values, "title"),
+    description: getStringValue(values, "description"),
+    name: getStringValue(values, "name"),
+    version: getStringValue(values, "version"),
+  });
+  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  await writeRegistryDefinition(paths, definition);
+
+  const port = Number(getStringValue(values, "port") ?? "8080");
+  const refreshed = await refreshRegistry(paths, { port });
+
+  console.log(`[yula] pulled "${definition.name}" into SQLite registry`);
+  if (definition.sourceRef) {
+    console.log(`[yula] source ref: ${definition.sourceRef}`);
+  }
+  if (definition.remoteUrl) {
+    console.log(`[yula] remote url: ${definition.remoteUrl}`);
+  }
+  console.log(`[yula] sqlite: ${paths.dbPath}`);
   console.log(`[yula] runtime url: ${refreshed.baseUrl}/${definition.name}`);
 }
 
@@ -152,7 +208,10 @@ async function handleList(args: string[]) {
       [
         `- ${definition.name}`,
         definition.displayName ? `display=${definition.displayName}` : null,
+        definition.title ? `title=${definition.title}` : null,
         definition.alias ? `alias=${definition.alias}` : null,
+        `source=${definition.sourceType}`,
+        definition.sourceRef ? `ref=${definition.sourceRef}` : null,
         `${baseUrl}/${definition.name}`,
       ]
         .filter(Boolean)
@@ -170,18 +229,21 @@ async function handleRun(args: string[]) {
       input: { type: "string" },
       path: { type: "string" },
       method: { type: "string" },
+      registry: { type: "string" },
       port: { type: "string" },
       host: { type: "string" },
     },
   });
-  const route = positionals[0];
-  if (!route) {
+  const selector = positionals[0];
+  if (!selector) {
     throw new Error(`"yula run" requires a route name.`);
   }
 
   const host = getStringValue(values, "host") ?? "127.0.0.1";
   const port = Number(getStringValue(values, "port") ?? "8080");
   const baseUrl = `http://${host}:${port}`;
+  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  const definition = await resolveRegistryDefinition(paths, selector);
   const toolName = getStringValue(values, "tool");
   const explicitPath = getStringValue(values, "path");
   const method = (getStringValue(values, "method") ?? (toolName ? "POST" : "GET"))
@@ -191,12 +253,12 @@ async function handleRun(args: string[]) {
   let body: string | undefined;
 
   if (!targetPath && toolName) {
-    targetPath = `/${route}/mcp/tools/${encodeURIComponent(toolName)}`;
+    targetPath = `/${definition.name}/mcp/tools/${encodeURIComponent(toolName)}`;
     body = JSON.stringify(toJsonBody(getStringValue(values, "input")), null, 2);
   }
 
   if (!targetPath) {
-    targetPath = `/${route}/mcp/tools`;
+    targetPath = `/${definition.name}/mcp/tools`;
   }
 
   const response = await fetch(`${baseUrl}${targetPath}`, {
@@ -221,6 +283,9 @@ async function handleCommand(command: string, args: string[]) {
     case "create":
     case "deploy":
       await handleCreate(command, args);
+      return;
+    case "pull":
+      await handlePull(args);
       return;
     case "delete":
       await handleDelete(args);

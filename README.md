@@ -12,16 +12,17 @@ Yula is a dynamic JavaScript function registry and execution layer built on top 
 Yula now also has a local-first flow built around:
 
 - `apps/yula-registry`: the merged local runtime + config generator
-- `packages/yula-cli`: the local control plane for create, deploy, delete, list, and run
+- `packages/yula-cli`: the local control plane for create, deploy, pull, delete, list, and run
 
-That means you can manage workers without the separate HTTP publisher/sync loop when you are working locally.
+That means you can manage workers without the older multi-service publish/sync loop when you are working locally.
+The registry stores definitions in SQLite, which makes it easier to copy, move, back up, or eventually sync with a remote registry.
 
 ## Workspace layout
 
-- `apps/yula-publisher`: accepts published worker modules and generates the `workerd` bundle (`config.capnp` + JS modules).
-- `apps/yula-worker`: downloads that bundle, mounts it into `workerd`, and routes incoming requests by worker name.
+- `apps/yula-registry`: merged runtime, SQLite-backed registry, and `workerd` config generator.
 - `packages/yula-core`: fetch-native SDK for building Yula-compatible MCP servers.
-- `examples/mcp-hono-stateless`: example MCP worker built with `@yula-xyz/core`.
+- `packages/yula-cli`: CLI for deploy, pull, list, delete, and run.
+- `examples/math-mcp`: example MCP worker built with `@yula-xyz/core`.
 - `examples/mcp-live-weather`: example MCP worker that fetches live weather and local time from Open-Meteo.
 - `examples/langchain-openai-agent`: example LangChain + OpenAI agent that connects to the published MCP server.
 - `examples/langchain-ollama-agent`: example LangChain + Ollama agent that connects to the same MCP servers.
@@ -41,6 +42,19 @@ pnpm install
 
 This is the new local-first path.
 
+By default the local registry state lives at:
+
+```text
+~/.yula/registry
+```
+
+That folder contains:
+
+- `registry.sqlite`: local and pulled worker definitions
+- `config/`: generated runtime files for `workerd`
+
+If you want the registry in a custom path, use `YULA_REGISTRY_ROOT=/path/to/registry` or `--registry /path/to/registry`.
+
 ### 1. Start the registry runtime
 
 Terminal 1:
@@ -54,8 +68,8 @@ pnpm --filter @yula-xyz/registry serve
 Terminal 2:
 
 ```bash
-pnpm --filter @yula-example/mcp-hono-stateless build
-pnpm --filter @yula-example/mcp-hono-stateless deploy:registry
+pnpm --filter @yula-example/math-mcp build
+pnpm --filter @yula-example/math-mcp deploy:registry
 ```
 
 ### 3. Inspect or run it through the CLI
@@ -74,47 +88,25 @@ pnpm --filter @yula-example/mcp-live-weather deploy:registry
 node packages/yula-cli/bin/yula.js run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}'
 ```
 
-The older `publisher + worker` split is still in the repo for compatibility, but the new direction is `registry + cli`.
+### 4. Pull a remote-style artifact into the local registry
 
-## Demo flow
+This is the beginning of the Docker-like flow. Today `pull` expects an artifact manifest from a file or URL, then stores it in SQLite so it becomes runnable locally.
 
-This is the fastest path to see the new MCP flow end-to-end.
-
-### 1. Start the publisher
-
-Terminal 1:
+Example:
 
 ```bash
-pnpm --filter @yula-xyz/publisher build
-cd apps/yula-publisher
-node dist/index.js
+node packages/yula-cli/bin/yula.js pull demo/shared-math:2.0.0 --file /tmp/shared-math.json
+node packages/yula-cli/bin/yula.js list
+node packages/yula-cli/bin/yula.js run shared-math-v2-0-0 --tool add --input '{"a":1,"b":2}'
 ```
 
-Publisher listens on `http://localhost:8086`.
+The reference format is designed to grow toward:
 
-### 2. Build and publish the example MCP worker
-
-Terminal 2:
-
-```bash
-pnpm --filter @yula-example/mcp-hono-stateless build
-pnpm --filter @yula-example/mcp-hono-stateless publish:local
+```text
+owner/package:version
 ```
 
-By default this publishes the worker as `math-mcp-v1-0-0`.
-
-### 3. Sync and start the Yula runtime
-
-Terminal 3:
-
-```bash
-pnpm --filter @yula-xyz/worker build
-cd apps/yula-worker
-pnpm sync
-pnpm serve
-```
-
-The public worker runtime listens on `http://localhost:8080`.
+That maps well to future `yula login`, remote S3-backed artifact storage, and `yula pull` semantics similar to container registries.
 
 ## Smoke tests
 
@@ -169,7 +161,7 @@ Expected result:
 
 ## LangChain + OpenAI demo
 
-After the three local services above are running:
+After the registry runtime is running and the math worker is deployed:
 
 ```bash
 export OPENAI_API_KEY=YOUR_KEY
@@ -201,22 +193,14 @@ pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin gunce
 
 If you want a clearly real-time example instead of the deterministic math demo:
 
-### 1. Publish the weather worker
+### 1. Build and deploy the weather worker
 
 ```bash
 pnpm --filter @yula-example/mcp-live-weather build
-pnpm --filter @yula-example/mcp-live-weather publish:local
+pnpm --filter @yula-example/mcp-live-weather deploy:registry
 ```
 
-### 2. Resync and serve the runtime
-
-```bash
-cd apps/yula-worker
-pnpm sync
-pnpm serve
-```
-
-### 3. Call the live weather tool
+### 2. Call the live weather tool
 
 ```bash
 curl -X POST http://127.0.0.1:8080/weather-live-v1-0-0/mcp/tools/current-weather \
@@ -233,7 +217,8 @@ That pair makes it easy to verify the result is being fetched live.
 
 ## Notes
 
-- Published worker route names can include dashes like `math-mcp-v1-0-0`. The publisher now normalizes those names into valid Cap'n Proto identifiers internally.
+- Published worker route names can include dashes like `math-mcp-v1-0-0`. Yula normalizes those names into valid `workerd` config identifiers internally.
+- The local-first registry uses Node's `node:sqlite`, which is still marked experimental in Node 22, but it gives Yula a portable single-file local registry.
 - The example MCP worker also exposes:
   - `GET /math-mcp-v1-0-0/mcp/tools`
   - `GET /math-mcp-v1-0-0/mcp/docs`
@@ -243,10 +228,10 @@ That pair makes it easy to verify the result is being fetched live.
 
 ## More detail
 
-- [Publisher README](/Users/alperreha/Desktop/alper/workspace/ai/yula/apps/yula-publisher/README.md)
-- [Worker README](/Users/alperreha/Desktop/alper/workspace/ai/yula/apps/yula-worker/README.md)
+- [Registry README](/Users/alperreha/Desktop/alper/workspace/ai/yula/apps/yula-registry/README.md)
+- [CLI README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-cli/README.md)
 - [Core SDK README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-core/README.md)
-- [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-hono-stateless/README.md)
+- [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/math-mcp/README.md)
 - [Live weather MCP example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-live-weather/README.md)
 - [LangChain agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/README.md)
 - [LangChain Ollama agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-ollama-agent/README.md)
