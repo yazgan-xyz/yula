@@ -1,0 +1,22 @@
+{
+  "name": "@yula-example/mcp-postgres",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/dev.ts",
+    "build": "esbuild src/worker.ts --bundle --format=esm --target=esnext --platform=node --outfile=dist/main.js",
+    "deploy:registry": "node ../../packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --flag nodejs_compat",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@yula-xyz/core": "workspace:*",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "esbuild": "^0.27.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}

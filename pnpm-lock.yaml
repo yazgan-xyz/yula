@@ -141,6 +141,31 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  examples/mcp-postgres:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.7)
+      '@yula-xyz/core':
+        specifier: workspace:*
+        version: link:../../packages/yula-core
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.8
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.15
+        version: 22.19.15
+      esbuild:
+        specifier: ^0.27.4
+        version: 0.27.4
+      tsx:
+        specifier: ^4.7.1
+        version: 4.21.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   packages/yula-cli:
     dependencies:
       '@yula-xyz/core':
@@ -1261,6 +1286,10 @@ packages:
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
+
+  postgres@3.4.8:
+    resolution: {integrity: sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg==}
+    engines: {node: '>=12'}
 
   proxy-addr@2.0.7:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
@@ -2531,6 +2560,8 @@ snapshots:
   picomatch@2.3.1: {}
 
   pkce-challenge@5.0.1: {}
+
+  postgres@3.4.8: {}
 
   proxy-addr@2.0.7:
     dependencies:

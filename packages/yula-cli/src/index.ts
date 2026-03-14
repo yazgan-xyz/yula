@@ -12,7 +12,29 @@ import {
   writeRegistryDefinition,
 } from "@yula-xyz/registry";
 
-type ParsedValues = Record<string, string | boolean | undefined>;
+type ParsedValues = Record<
+  string,
+  string | string[] | boolean | undefined
+>;
+
+function getStringListValue(values: ParsedValues, key: string) {
+  const value = values[key];
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => `${item}`.split(","))
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
 
 function getRegistryRootValue(values: ParsedValues) {
   return getStringValue(values, "registry") ?? process.env.YULA_REGISTRY_ROOT;
@@ -38,6 +60,7 @@ Commands:
 
 Examples:
   yula create examples/mcp-live-weather/dist/main.js --name weather-live --version 1.0.0 --env .env.weather
+  yula deploy examples/mcp-postgres/dist/main.js --name postgres-mcp --version 1.0.0 --flag nodejs_compat --env .env.postgres
   yula pull alper/weather-live:1.0.0 --url https://example.com/weather-live.json --env .env.weather
   yula list
   yula run weather-live-v1-0-0
@@ -92,6 +115,7 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
     options: {
       name: { type: "string" },
       version: { type: "string" },
+      flag: { type: "string", multiple: true },
       env: { type: "string" },
       registry: { type: "string" },
       alias: { type: "string" },
@@ -111,6 +135,7 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
     file,
     name: requireStringValue(values, "name"),
     version: getStringValue(values, "version"),
+    flags: getStringListValue(values, "flag"),
     env: getStringValue(values, "env"),
     alias: getStringValue(values, "alias"),
     displayName: getStringValue(values, "display-name"),
@@ -127,6 +152,9 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
   console.log(`[yula] deployed "${definition.name}" from ${path.resolve(file)}`);
   if (definition.alias) {
     console.log(`[yula] alias: ${definition.alias}`);
+  }
+  if (definition.flags?.length) {
+    console.log(`[yula] flags: ${definition.flags.join(", ")}`);
   }
   if (definition.envFilePath) {
     console.log(`[yula] env file: ${definition.envFilePath}`);
@@ -145,6 +173,7 @@ async function handlePull(args: string[]) {
       port: { type: "string" },
       url: { type: "string" },
       file: { type: "string" },
+      flag: { type: "string", multiple: true },
       env: { type: "string" },
       alias: { type: "string" },
       "display-name": { type: "string" },
@@ -160,6 +189,7 @@ async function handlePull(args: string[]) {
     reference,
     url: getStringValue(values, "url"),
     file: getStringValue(values, "file"),
+    flags: getStringListValue(values, "flag"),
     env: getStringValue(values, "env"),
     alias: getStringValue(values, "alias"),
     displayName: getStringValue(values, "display-name"),
@@ -180,6 +210,9 @@ async function handlePull(args: string[]) {
   }
   if (definition.remoteUrl) {
     console.log(`[yula] remote url: ${definition.remoteUrl}`);
+  }
+  if (definition.flags?.length) {
+    console.log(`[yula] flags: ${definition.flags.join(", ")}`);
   }
   if (definition.envFilePath) {
     console.log(`[yula] env file: ${definition.envFilePath}`);
@@ -237,6 +270,9 @@ async function handleList(args: string[]) {
         definition.displayName ? `display=${definition.displayName}` : null,
         definition.title ? `title=${definition.title}` : null,
         definition.alias ? `alias=${definition.alias}` : null,
+        definition.flags?.length
+          ? `flags=${definition.flags.join(",")}`
+          : null,
         definition.envFilePath ? `env=${definition.envFilePath}` : null,
         `source=${definition.sourceType}`,
         definition.sourceRef ? `ref=${definition.sourceRef}` : null,

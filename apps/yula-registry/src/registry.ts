@@ -114,6 +114,7 @@ export type CreateRegistryDefinitionOptions = {
   name?: string;
   version?: string;
   compatibilityDate?: string;
+  flags?: string[];
   env?: string;
   alias?: string;
   displayName?: string;
@@ -127,6 +128,7 @@ export type PullRegistryArtifactOptions = {
   file?: string;
   name?: string;
   version?: string;
+  flags?: string[];
   env?: string;
   alias?: string;
   displayName?: string;
@@ -450,6 +452,20 @@ function normalizeReferenceSegment(value: string) {
   return sanitizeWorkerNameSegment(value);
 }
 
+function normalizeCompatibilityFlags(flags?: string[]) {
+  if (!flags?.length) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      flags
+        .map((flag) => flag.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 async function resolveEnvFilePath(envFile?: string) {
   if (!envFile?.trim()) {
     return undefined;
@@ -513,6 +529,15 @@ function renderWorkerBindings(bindings: Array<{ name: string; value: string }>) 
     .join(",\n");
 
   return `\n    bindings = [\n${renderedBindings}\n    ],`;
+}
+
+function renderCompatibilityFlags(flags: string[]) {
+  const normalized = normalizeCompatibilityFlags(flags);
+  if (normalized.length === 0) {
+    return "";
+  }
+
+  return `\n    compatibilityFlags = [${normalized.map((flag) => `"${escapeCapnpString(flag)}"`).join(", ")}],`;
 }
 
 export function parseRegistryReference(reference: string): RegistryReference {
@@ -709,6 +734,7 @@ export async function createRegistryDefinition(
     version,
     module: moduleSource,
     compatibilityDate: options.compatibilityDate ?? "2023-02-28",
+    flags: normalizeCompatibilityFlags(options.flags),
   });
 
   return RegistryWorkerDefinitionSchema.parse({
@@ -742,6 +768,10 @@ export async function pullRegistryArtifact(options: PullRegistryArtifactOptions)
     options.version ?? artifact.version ?? reference?.version ?? "1.0.0";
   const owner = artifact.owner ?? reference?.owner;
   const envFilePath = await resolveEnvFilePath(options.env);
+  const compatibilityFlags = normalizeCompatibilityFlags([
+    ...(artifact.flags ?? []),
+    ...(options.flags ?? []),
+  ]);
   const sourceRef =
     reference?.sourceRef ??
     (owner
@@ -756,7 +786,7 @@ export async function pullRegistryArtifact(options: PullRegistryArtifactOptions)
 
   return RegistryWorkerDefinitionSchema.parse({
     ...publishedDefinition,
-    flags: artifact.flags,
+    flags: compatibilityFlags,
     compatibilityDate: artifact.compatibilityDate ?? "2023-02-28",
     alias: options.alias
       ? sanitizeWorkerNameSegment(options.alias)
@@ -813,7 +843,7 @@ export async function refreshRegistry(
     capnp += `
 const ${workerIdentifier} :Workerd.Worker = (
     compatibilityDate = "${definition.compatibilityDate || "2023-02-28"}",
-    modules = [(name = "${definition.name}.js", esModule = embed "${definition.name}.js")],${renderWorkerBindings(envBindings)}
+    modules = [(name = "${definition.name}.js", esModule = embed "${definition.name}.js")],${renderCompatibilityFlags(definition.flags ?? [])}${renderWorkerBindings(envBindings)}
 );`;
 
     capnp = insertIntoCapnpList(

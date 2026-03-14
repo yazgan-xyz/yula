@@ -31,6 +31,7 @@
     "yula": "node packages/yula-cli/bin/yula.js",
     "example-math": "pnpm --filter @yula-example/math-mcp",
     "example-chat-openai": "pnpm --filter @yula-example/chat-openai",
+    "example-postgres": "pnpm --filter @yula-example/mcp-postgres",
     "example-weather": "pnpm --filter @yula-example/mcp-live-weather",
     "example-chat-ollama": "pnpm --filter @yula-example/chat-ollama"
   },

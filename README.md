@@ -23,6 +23,7 @@ The registry stores definitions in SQLite, which makes it easier to copy, move, 
 - `packages/yula-core`: fetch-native SDK for building Yula-compatible MCP servers.
 - `packages/yula-cli`: CLI for deploy, pull, list, delete, and run.
 - `examples/math-mcp`: example MCP worker built with `@yula-xyz/core`.
+- `examples/mcp-postgres`: example MCP worker that executes SQL against PostgreSQL using a `DB_DSN` env binding.
 - `examples/mcp-live-weather`: example MCP worker that fetches live weather and local time from Open-Meteo.
 - `examples/chat-openai`: example chat client powered by LangChain + OpenAI that connects to Yula MCP servers.
 - `examples/chat-ollama`: example chat client powered by LangChain + Ollama that connects to the same MCP servers.
@@ -88,6 +89,21 @@ pnpm --filter @yula-example/mcp-live-weather deploy:registry
 node packages/yula-cli/bin/yula.js run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}'
 ```
 
+For the PostgreSQL example:
+
+```bash
+pnpm --filter @yula-example/mcp-postgres build
+node packages/yula-cli/bin/yula.js deploy examples/mcp-postgres/dist/main.js \
+  --name postgres-mcp \
+  --version 1.0.0 \
+  --flag nodejs_compat \
+  --env examples/mcp-postgres/.env.postgres
+node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 \
+  --tool execute-sql \
+  --input '{"query":"select now() as current_time"}' \
+  --env examples/mcp-postgres/.env.postgres
+```
+
 ### 4. Pull a remote-style artifact into the local registry
 
 This is the beginning of the Docker-like flow. Today `pull` expects an artifact manifest from a file or URL, then stores it in SQLite so it becomes runnable locally.
@@ -118,6 +134,16 @@ node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --
 ```
 
 Yula stores the env file path in SQLite, parses the file during config generation, and writes each variable into the worker's `workerd` bindings. If `serve` is running, env file changes also trigger a restart so the new values are picked up automatically.
+
+Some workers may also need runtime flags. You can add those with repeated `--flag` options:
+
+```bash
+node packages/yula-cli/bin/yula.js deploy dist/main.js \
+  --name postgres-mcp \
+  --version 1.0.0 \
+  --flag nodejs_compat \
+  --env .env.postgres
+```
 
 ## Smoke tests
 
@@ -226,6 +252,36 @@ Look for these two fields in the response:
 
 That pair makes it easy to verify the result is being fetched live.
 
+## PostgreSQL demo
+
+If you want a worker that talks to a real database through an env-provided DSN:
+
+### 1. Prepare the env file
+
+```bash
+cp examples/mcp-postgres/.env.example examples/mcp-postgres/.env.postgres
+```
+
+### 2. Build and deploy the Postgres worker
+
+```bash
+pnpm --filter @yula-example/mcp-postgres build
+node packages/yula-cli/bin/yula.js deploy examples/mcp-postgres/dist/main.js \
+  --name postgres-mcp \
+  --version 1.0.0 \
+  --flag nodejs_compat \
+  --env examples/mcp-postgres/.env.postgres
+```
+
+### 3. Execute a SQL query
+
+```bash
+node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 \
+  --tool execute-sql \
+  --input '{"query":"select now() as current_time"}' \
+  --env examples/mcp-postgres/.env.postgres
+```
+
 ## Notes
 
 - Published worker route names can include dashes like `math-mcp-v1-0-0`. Yula normalizes those names into valid `workerd` config identifiers internally.
@@ -243,6 +299,7 @@ That pair makes it easy to verify the result is being fetched live.
 - [CLI README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-cli/README.md)
 - [Core SDK README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-core/README.md)
 - [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/math-mcp/README.md)
+- [PostgreSQL MCP example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-postgres/README.md)
 - [Live weather MCP example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-live-weather/README.md)
 - [Chat OpenAI example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/chat-openai/README.md)
 - [Chat Ollama example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/chat-ollama/README.md)
