@@ -38,8 +38,8 @@ node packages/yula-cli/bin/yula.js run weather-live-v1-0-0 --tool current-weathe
 Env-backed worker example:
 
 ```bash
-node packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --env .env.postgres
-node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --input '{"sql":"select now()"}'
+node packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --flag nodejs_compat --env .env.postgres
+node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --input '{"query":"select now()"}'
 ```
 
 If `.env.postgres` changes while `serve` is running, Yula watches that file and restarts `workerd` so the worker sees the new values.

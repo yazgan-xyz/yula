@@ -1,32 +1,189 @@
-import postgres from "postgres";
+import { Client, type ClientConfig } from "pg";
 import { createYulaMcpServer, z } from "@yula-xyz/core";
 
 type PostgresEnv = {
+  DB_URL?: string;
+  DBDSN?: string;
   DB_DSN?: string;
+  DB_USERNAME?: string;
+  DB_USER?: string;
+  DB_PASSWORD?: string;
+  DB_HOST?: string;
+  DB_PORT?: string | number;
+  DB_NAME?: string;
+  DB_SSL?: string | boolean;
+  DB_SSL_REJECT_UNAUTHORIZED?: string | boolean;
 };
 
 type QueryParam = string | number | boolean | null;
 
-function getDsn(env: PostgresEnv) {
-  const dsn = env.DB_DSN?.trim();
-  if (!dsn) {
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function parseBooleanFlag(
+  value: unknown,
+  envName: string,
+): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = normalizeText(value).toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(
+    `Env binding "${envName}" must be one of true/false, yes/no, on/off, or 1/0.`,
+  );
+}
+
+function parsePort(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const port = Number.parseInt(normalized, 10);
+  if (!Number.isInteger(port) || port <= 0) {
     throw new Error(
-      'Missing required env binding "DB_DSN". Deploy or run this worker with --env pointing at a file that contains DB_DSN=postgresql://...',
+      'Env binding "DB_PORT" must be a positive integer when provided.',
     );
   }
 
-  return dsn;
+  return port;
+}
+
+function resolveSslConfig(env: PostgresEnv): ClientConfig["ssl"] | undefined {
+  const sslEnabled = parseBooleanFlag(env.DB_SSL, "DB_SSL");
+  if (sslEnabled === undefined) {
+    return undefined;
+  }
+
+  if (!sslEnabled) {
+    return false;
+  }
+
+  const rejectUnauthorized = parseBooleanFlag(
+    env.DB_SSL_REJECT_UNAUTHORIZED,
+    "DB_SSL_REJECT_UNAUTHORIZED",
+  );
+
+  if (rejectUnauthorized === false) {
+    return {
+      rejectUnauthorized: false,
+    };
+  }
+
+  return true;
+}
+
+function getClientConfig(env: PostgresEnv): ClientConfig {
+  const connectionString =
+    normalizeText(env.DB_URL) ||
+    normalizeText(env.DBDSN) ||
+    normalizeText(env.DB_DSN);
+  const ssl = resolveSslConfig(env);
+
+  if (connectionString) {
+    return ssl === undefined ? { connectionString } : { connectionString, ssl };
+  }
+
+  const user = normalizeText(env.DB_USERNAME) || normalizeText(env.DB_USER);
+  const password = normalizeText(env.DB_PASSWORD);
+  const host = normalizeText(env.DB_HOST);
+  const database = normalizeText(env.DB_NAME);
+  const port = parsePort(env.DB_PORT) ?? 5432;
+
+  if (!user || !password || !host || !database) {
+    throw new Error(
+      'Missing PostgreSQL connection config. Provide "DB_URL" (or "DBDSN"/"DB_DSN") or set "DB_USERNAME", "DB_PASSWORD", "DB_HOST", and "DB_NAME".',
+    );
+  }
+
+  return ssl === undefined
+    ? {
+        user,
+        password,
+        host,
+        port,
+        database,
+      }
+    : {
+        user,
+        password,
+        host,
+        port,
+        database,
+        ssl,
+      };
 }
 
 function normalizeParameters(parameters?: QueryParam[]) {
   return Array.isArray(parameters) ? parameters : [];
 }
 
+function toSerializableValue(value: unknown): unknown {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (value instanceof Uint8Array) {
+    return Array.from(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toSerializableValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        toSerializableValue(nestedValue),
+      ]),
+    );
+  }
+
+  return String(value);
+}
+
+function inferCommand(query: string) {
+  const [command = "QUERY"] = query.trim().split(/\s+/, 1);
+  return command.toUpperCase();
+}
+
 const postgresMcp = createYulaMcpServer<PostgresEnv>({
   name: "yula-postgres-mcp",
   version: "1.0.0",
   description:
-    "Example Yula MCP server that executes SQL queries against a PostgreSQL database using the DB_DSN env binding.",
+    "Example Yula MCP server that executes SQL queries against PostgreSQL using Cloudflare's official pg client pattern for Workers and workerd.",
   basePath: "/mcp",
 });
 
@@ -35,7 +192,7 @@ postgresMcp.tool(
   {
     title: "Execute SQL",
     description:
-      "Executes a SQL statement against PostgreSQL using the DB_DSN env binding. This can read or mutate data depending on the query text.",
+      "Executes a SQL statement against PostgreSQL using a DB_URL-style connection string or explicit DB_HOST/DB_PORT/DB_NAME credentials. This can read or mutate data depending on the query text.",
     inputSchema: {
       query: z
         .string()
@@ -82,30 +239,32 @@ postgresMcp.tool(
     ],
   },
   async ({ query, parameters }, context) => {
-    const sql = postgres(getDsn(context.env), {
-      prepare: false,
-      max: 1,
-      idle_timeout: 5,
-      connect_timeout: 10,
-    });
+    const sql = new Client(getClientConfig(context.env));
 
     try {
+      await sql.connect();
+
       const normalizedParameters = normalizeParameters(parameters);
       const result =
         normalizedParameters.length > 0
-          ? await sql.unsafe(query, normalizedParameters)
-          : await sql.unsafe(query);
+          ? await sql.query(query, normalizedParameters)
+          : await sql.query(query);
 
       return {
-        command: result.command,
-        rowCount: result.count,
-        rows: result.map((row) => ({ ...row })),
-        columns: result.columns.map((column) => column.name),
+        command: result.command || inferCommand(query),
+        rowCount: result.rowCount ?? result.rows.length,
+        rows: result.rows.map((row) =>
+          Object.fromEntries(
+            Object.entries(row).map(([key, value]) => [
+              key,
+              toSerializableValue(value),
+            ]),
+          ),
+        ),
+        columns: result.fields.map((field) => field.name),
       };
     } finally {
-      await sql.end({
-        timeout: 5,
-      });
+      await sql.end();
     }
   },
 );

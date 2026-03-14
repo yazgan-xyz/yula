@@ -23,7 +23,7 @@ The registry stores definitions in SQLite, which makes it easier to copy, move, 
 - `packages/yula-core`: fetch-native SDK for building Yula-compatible MCP servers.
 - `packages/yula-cli`: CLI for deploy, pull, list, delete, and run.
 - `examples/math-mcp`: example MCP worker built with `@yula-xyz/core`.
-- `examples/mcp-postgres`: example MCP worker that executes SQL against PostgreSQL using a `DB_DSN` env binding.
+- `examples/mcp-postgres`: example MCP worker that executes SQL against PostgreSQL using Cloudflare's official `pg` Worker pattern and a `DB_URL`-style env binding.
 - `examples/mcp-live-weather`: example MCP worker that fetches live weather and local time from Open-Meteo.
 - `examples/chat-openai`: example chat client powered by LangChain + OpenAI that connects to Yula MCP servers.
 - `examples/chat-ollama`: example chat client powered by LangChain + Ollama that connects to the same MCP servers.
@@ -129,8 +129,8 @@ That maps well to future `yula login`, remote S3-backed artifact storage, and `y
 If a worker needs secrets or connection strings, give it a local `.env` file when you deploy or run it:
 
 ```bash
-node packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --env .env.postgres
-node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --input '{"sql":"select now()"}' --env .env.postgres
+node packages/yula-cli/bin/yula.js deploy dist/main.js --name postgres-mcp --version 1.0.0 --flag nodejs_compat --env .env.postgres
+node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 --tool execute-sql --input '{"query":"select now()"}' --env .env.postgres
 ```
 
 Yula stores the env file path in SQLite, parses the file during config generation, and writes each variable into the worker's `workerd` bindings. If `serve` is running, env file changes also trigger a restart so the new values are picked up automatically.
@@ -282,6 +282,8 @@ node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 \
   --env examples/mcp-postgres/.env.postgres
 ```
 
+The example accepts `DB_URL`, `DBDSN`, or `DB_DSN`, and it can also read explicit `DB_USERNAME`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, and `DB_NAME` fields from the env file.
+
 ## Notes
 
 - Published worker route names can include dashes like `math-mcp-v1-0-0`. Yula normalizes those names into valid `workerd` config identifiers internally.
@@ -292,6 +294,7 @@ node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 \
   - `GET /math-mcp-v1-0-0/mcp/openapi.json`
 - The live weather worker exposes the same helper routes under `weather-live-v1-0-0`.
 - The live weather example requires outbound internet access because it calls Open-Meteo in real time.
+- The PostgreSQL example follows Cloudflare's official `pg` tutorial pattern for Workers, so it requires `nodejs_compat` and a reachable PostgreSQL server.
 
 ## More detail
 

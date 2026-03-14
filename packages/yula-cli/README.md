@@ -27,7 +27,7 @@ Worker-level env example:
 
 ```bash
 pnpm exec yula deploy dist/main.js --name postgres-mcp --version 1.0.0 --env .env.postgres
-pnpm exec yula run postgres-mcp-v1-0-0 --tool execute-sql --input '{"sql":"select now()"}' --env .env.postgres
+pnpm exec yula run postgres-mcp-v1-0-0 --tool execute-sql --input '{"query":"select now()"}' --env .env.postgres
 ```
 
 Worker flag example:

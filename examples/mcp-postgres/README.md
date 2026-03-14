@@ -1,8 +1,8 @@
 # MCP Postgres example
 
-This example is a Yula MCP server that executes SQL against PostgreSQL.
+This example is a Yula MCP server that executes SQL against PostgreSQL using the same `pg` client pattern Cloudflare documents for Workers and `workerd`.
 
-It reads the database connection string from the `DB_DSN` env binding and exposes one tool:
+It exposes one tool:
 
 - `execute-sql`
 
@@ -10,11 +10,11 @@ It reads the database connection string from the `DB_DSN` env binding and expose
 
 - accepts a raw SQL string
 - optionally accepts positional parameters
-- connects to PostgreSQL using `DB_DSN`
-- executes the query
+- creates a `pg` client inside the request
+- connects, runs the query, and closes the connection
 - returns the command, row count, rows, and column names
 
-## Env file
+## Connection env
 
 Create a local env file:
 
@@ -22,16 +22,31 @@ Create a local env file:
 cp examples/mcp-postgres/.env.example examples/mcp-postgres/.env.postgres
 ```
 
-Expected env shape:
+The worker accepts either a single connection string:
 
 ```text
-DB_DSN=postgresql://username:password@host:5432/database
+DB_URL=postgresql://username:password@host:5432/database
+DB_SSL=false
 ```
+
+or explicit fields:
+
+```text
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_NAME=postgres
+DB_SSL=false
+```
+
+For backward compatibility it also accepts `DBDSN` and `DB_DSN` as aliases for `DB_URL`.
 
 ## Local standalone development
 
 ```bash
-export DB_DSN=postgresql://postgres:postgres@127.0.0.1:5432/postgres
+export DB_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres
+export DB_SSL=false
 pnpm --filter @yula-example/mcp-postgres dev
 ```
 
@@ -92,5 +107,6 @@ node packages/yula-cli/bin/yula.js run postgres-mcp-v1-0-0 \
 ## Notes
 
 - This example executes raw SQL, so it should only be used against databases you trust.
-- The `DB_DSN` env file path is stored in the local Yula registry and turned into `workerd` env bindings during refresh.
-- The deploy command enables `nodejs_compat`, because the underlying `postgres` (`Postgres.js`) driver uses Node-compatible sockets in the worker runtime.
+- The `.env` file path is stored in the local Yula registry and turned into `workerd` text bindings during refresh.
+- The deploy command enables `nodejs_compat`, because the official Cloudflare `pg` flow relies on Worker TCP socket support and Node compatibility.
+- This example is closest to the official Cloudflare tutorial at [developers.cloudflare.com/workers/tutorials/postgres](https://developers.cloudflare.com/workers/tutorials/postgres/).
