@@ -1,5 +1,5 @@
 {
-  "name": "@yula-example/langchain-ollama-agent",
+  "name": "@yula-example/chat-openai",
   "version": "0.0.1",
   "type": "module",
   "scripts": {
@@ -8,8 +8,9 @@
   },
   "dependencies": {
     "@langchain/mcp-adapters": "^1.1.3",
-    "@langchain/ollama": "^1.2.6",
-    "langchain": "^1.2.32"
+    "@langchain/openai": "^1.2.13",
+    "langchain": "^1.2.32",
+    "openai": "^6.29.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.15",

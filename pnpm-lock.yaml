@@ -50,7 +50,7 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
-  examples/langchain-ollama-agent:
+  examples/chat-ollama:
     dependencies:
       '@langchain/mcp-adapters':
         specifier: ^1.1.3
@@ -72,7 +72,7 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
-  examples/langchain-openai-agent:
+  examples/chat-openai:
     dependencies:
       '@langchain/mcp-adapters':
         specifier: ^1.1.3

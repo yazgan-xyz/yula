@@ -1,6 +1,8 @@
-# LangChain Ollama agent example
+# Chat Ollama example
 
-This example is the Ollama equivalent of the existing OpenAI agent demo.
+This example is the Ollama equivalent of the OpenAI chat demo.
+
+If you want to chat with your local Ollama model against a Yula MCP server, this is the example to run.
 
 It keeps the same MCP and prompt flow:
 
@@ -58,13 +60,13 @@ export YULA_MCP_URL=http://localhost:8080/weather-live-v1-0-0/mcp
 Math example:
 
 ```bash
-pnpm --filter @yula-example/langchain-ollama-agent start -- "127 ile 19'u carp ve sonucu bana soyle"
+pnpm --filter @yula-example/chat-ollama start -- "127 ile 19'u carp ve sonucu bana soyle"
 ```
 
 Weather example:
 
 ```bash
-pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
+pnpm --filter @yula-example/chat-ollama start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
 ```
 
 ## Notes

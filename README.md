@@ -24,8 +24,8 @@ The registry stores definitions in SQLite, which makes it easier to copy, move, 
 - `packages/yula-cli`: CLI for deploy, pull, list, delete, and run.
 - `examples/math-mcp`: example MCP worker built with `@yula-xyz/core`.
 - `examples/mcp-live-weather`: example MCP worker that fetches live weather and local time from Open-Meteo.
-- `examples/langchain-openai-agent`: example LangChain + OpenAI agent that connects to the published MCP server.
-- `examples/langchain-ollama-agent`: example LangChain + Ollama agent that connects to the same MCP servers.
+- `examples/chat-openai`: example chat client powered by LangChain + OpenAI that connects to Yula MCP servers.
+- `examples/chat-ollama`: example chat client powered by LangChain + Ollama that connects to the same MCP servers.
 
 ## Requirements
 
@@ -159,34 +159,34 @@ Expected result:
 }
 ```
 
-## LangChain + OpenAI demo
+## Chat OpenAI demo
 
 After the registry runtime is running and the math worker is deployed:
 
 ```bash
 export OPENAI_API_KEY=YOUR_KEY
 export YULA_MCP_URL=http://localhost:8080/math-mcp-v1-0-0/mcp
-pnpm --filter @yula-example/langchain-openai-agent start -- "127 ile 19'u carp ve sonucu bana soyle"
+pnpm --filter @yula-example/chat-openai start -- "127 ile 19'u carp ve sonucu bana soyle"
 ```
 
-The agent will load tools from the MCP server via `MultiServerMCPClient`, let `ChatOpenAI` decide when to call them, and then return the final answer.
+If you want to chat with OpenAI and let it call MCP tools automatically, this is the example to run. It loads tools from the MCP server via `MultiServerMCPClient`, lets `ChatOpenAI` decide when to call them, and then returns the final answer.
 
-## LangChain + Ollama demo
+## Chat Ollama demo
 
-If you want the exact same agent flow against your local Ollama instead of OpenAI:
+If you want to chat with your local Ollama model instead of OpenAI, this is the matching example:
 
 ```bash
 export OLLAMA_MODEL=llama3.1
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export YULA_MCP_URL=http://localhost:8080/math-mcp-v1-0-0/mcp
-pnpm --filter @yula-example/langchain-ollama-agent start -- "127 ile 19'u carp ve sonucu bana soyle"
+pnpm --filter @yula-example/chat-ollama start -- "127 ile 19'u carp ve sonucu bana soyle"
 ```
 
 For the live weather MCP server:
 
 ```bash
 export YULA_MCP_URL=http://localhost:8080/weather-live-v1-0-0/mcp
-pnpm --filter @yula-example/langchain-ollama-agent start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
+pnpm --filter @yula-example/chat-ollama start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
 ```
 
 ## Live weather demo
@@ -233,5 +233,5 @@ That pair makes it easy to verify the result is being fetched live.
 - [Core SDK README](/Users/alperreha/Desktop/alper/workspace/ai/yula/packages/yula-core/README.md)
 - [MCP worker example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/math-mcp/README.md)
 - [Live weather MCP example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/mcp-live-weather/README.md)
-- [LangChain agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/README.md)
-- [LangChain Ollama agent example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-ollama-agent/README.md)
+- [Chat OpenAI example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/chat-openai/README.md)
+- [Chat Ollama example](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/chat-ollama/README.md)

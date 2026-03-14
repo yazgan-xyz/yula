@@ -1,6 +1,8 @@
-# LangChain OpenAI agent example
+# Chat OpenAI example
 
-This example shows how to connect LangChain's `createAgent()` to a Yula-served MCP server.
+This example shows how to chat with OpenAI while letting the model call Yula-served MCP tools through LangChain.
+
+If you want to chat with OpenAI against a Yula MCP server, this is the example to run.
 
 It uses:
 
@@ -8,7 +10,7 @@ It uses:
 - `ChatOpenAI` from `@langchain/openai`
 - the MCP endpoint exposed by the published math demo worker
 
-If you want the same flow with a local model instead, use the sibling Ollama example at [examples/langchain-ollama-agent](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-ollama-agent/README.md).
+If you want the same chat flow with a local model instead, use the sibling Ollama example at [examples/chat-ollama](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/chat-ollama/README.md).
 
 ## Prerequisites
 
@@ -65,10 +67,10 @@ export YULA_MCP_URL=http://localhost:8080/weather-live-v1-0-0/mcp
 ## Run
 
 ```bash
-pnpm --filter @yula-example/langchain-openai-agent start -- "127 ile 19'u carp ve sonucu bana soyle"
+pnpm --filter @yula-example/chat-openai start -- "127 ile 19'u carp ve sonucu bana soyle"
 ```
 
-The agent will:
+The chat client will:
 
 1. load tools from the remote Yula MCP endpoint,
 2. decide when to call those tools,
@@ -80,16 +82,16 @@ If the model calls a tool but does not produce a final text answer, the example 
 ## Suggested demo prompt
 
 ```bash
-pnpm --filter @yula-example/langchain-openai-agent start -- "11 ile 13'u carp, sonra sonucu 5'e bol ve bana tek cumleyle soyle"
+pnpm --filter @yula-example/chat-openai start -- "11 ile 13'u carp, sonra sonucu 5'e bol ve bana tek cumleyle soyle"
 ```
 
 Weather-specific prompt:
 
 ```bash
-pnpm --filter @yula-example/langchain-openai-agent start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
+pnpm --filter @yula-example/chat-openai start -- "Istanbul icin guncel hava durumunu ve saati kontrol et"
 ```
 
 ## Related files
 
-- Agent entry: [src/index.ts](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/langchain-openai-agent/src/index.ts)
+- Chat entry: [src/index.ts](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/chat-openai/src/index.ts)
 - MCP worker example: [examples/math-mcp](/Users/alperreha/Desktop/alper/workspace/ai/yula/examples/math-mcp/README.md)

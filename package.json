@@ -30,9 +30,9 @@
     "cli": "pnpm --filter @yula-xyz/cli",
     "yula": "node packages/yula-cli/bin/yula.js",
     "example-math": "pnpm --filter @yula-example/math-mcp",
-    "example-agent": "pnpm --filter @yula-example/langchain-openai-agent",
+    "example-chat-openai": "pnpm --filter @yula-example/chat-openai",
     "example-weather": "pnpm --filter @yula-example/mcp-live-weather",
-    "example-ollama": "pnpm --filter @yula-example/langchain-ollama-agent"
+    "example-chat-ollama": "pnpm --filter @yula-example/chat-ollama"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.2",
