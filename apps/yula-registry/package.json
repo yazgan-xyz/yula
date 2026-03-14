@@ -1,0 +1,24 @@
+{
+  "name": "@yula-xyz/registry",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "refresh": "tsx src/bin/refresh.ts",
+    "serve": "tsx src/bin/serve.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@yula-xyz/core": "workspace:*",
+    "esbuild": "^0.27.4",
+    "workerd": "^1.20260313.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}

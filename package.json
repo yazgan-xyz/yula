@@ -26,6 +26,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky",
     "dev:all": "pnpm --filter @yula-xyz/* dev",
+    "registry": "pnpm --filter @yula-xyz/registry",
+    "cli": "pnpm --filter @yula-xyz/cli",
     "worker": "pnpm --filter @yula-xyz/worker",
     "publisher": "pnpm --filter @yula-xyz/publisher",
     "example-hono": "pnpm --filter @yula-example/mcp-hono-stateless",

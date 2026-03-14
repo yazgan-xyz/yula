@@ -7,6 +7,15 @@ Yula is a dynamic JavaScript function registry and execution layer built on top 
 - expose them as MCP servers,
 - and let agents call them through LangChain or direct HTTP.
 
+## Local-first registry
+
+Yula now also has a local-first flow built around:
+
+- `apps/yula-registry`: the merged local runtime + config generator
+- `packages/yula-cli`: the local control plane for create, deploy, delete, list, and run
+
+That means you can manage workers without the separate HTTP publisher/sync loop when you are working locally.
+
 ## Workspace layout
 
 - `apps/yula-publisher`: accepts published worker modules and generates the `workerd` bundle (`config.capnp` + JS modules).
@@ -27,6 +36,45 @@ Yula is a dynamic JavaScript function registry and execution layer built on top 
 ```bash
 pnpm install
 ```
+
+## Registry + CLI flow
+
+This is the new local-first path.
+
+### 1. Start the registry runtime
+
+Terminal 1:
+
+```bash
+pnpm --filter @yula-xyz/registry serve
+```
+
+### 2. Build and deploy a worker into the registry
+
+Terminal 2:
+
+```bash
+pnpm --filter @yula-example/mcp-hono-stateless build
+pnpm --filter @yula-example/mcp-hono-stateless deploy:registry
+```
+
+### 3. Inspect or run it through the CLI
+
+```bash
+node packages/yula-cli/bin/yula.js list --registry apps/yula-registry
+node packages/yula-cli/bin/yula.js run math-mcp-v1-0-0
+node packages/yula-cli/bin/yula.js run math-mcp-v1-0-0 --tool add --input '{"a":12,"b":30}'
+```
+
+For the live weather example:
+
+```bash
+pnpm --filter @yula-example/mcp-live-weather build
+pnpm --filter @yula-example/mcp-live-weather deploy:registry
+node packages/yula-cli/bin/yula.js run weather-live-v1-0-0 --tool current-weather --input '{"city":"Istanbul","countryCode":"TR"}'
+```
+
+The older `publisher + worker` split is still in the repo for compatibility, but the new direction is `registry + cli`.
 
 ## Demo flow
 

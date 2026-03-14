@@ -1,0 +1,20 @@
+{
+  "name": "@yula-xyz/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "yula": "./bin/yula.js"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@yula-xyz/core": "workspace:*",
+    "@yula-xyz/registry": "workspace:*",
+    "tsx": "^4.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "typescript": "^5.8.3"
+  }
+}
