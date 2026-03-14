@@ -14,6 +14,17 @@ import {
 
 type ParsedValues = Record<string, string | boolean | undefined>;
 
+function getRegistryRootValue(values: ParsedValues) {
+  return getStringValue(values, "registry") ?? process.env.YULA_REGISTRY_ROOT;
+}
+
+async function resolveCliRegistryPaths(values: ParsedValues) {
+  return resolveRegistryPaths(getRegistryRootValue(values), {
+    startDir: process.cwd(),
+    stateRootBaseDir: process.cwd(),
+  });
+}
+
 function printHelp() {
   console.log(`yula <command> [options]
 
@@ -99,7 +110,7 @@ async function handleCreate(command: "create" | "deploy", args: string[]) {
     description: getStringValue(values, "description"),
     compatibilityDate: getStringValue(values, "compatibility-date"),
   });
-  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  const paths = await resolveCliRegistryPaths(values);
   await writeRegistryDefinition(paths, definition);
 
   const port = Number(getStringValue(values, "port") ?? "8080");
@@ -144,7 +155,7 @@ async function handlePull(args: string[]) {
     name: getStringValue(values, "name"),
     version: getStringValue(values, "version"),
   });
-  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  const paths = await resolveCliRegistryPaths(values);
   await writeRegistryDefinition(paths, definition);
 
   const port = Number(getStringValue(values, "port") ?? "8080");
@@ -175,7 +186,7 @@ async function handleDelete(args: string[]) {
     throw new Error(`"yula delete" requires a route or alias.`);
   }
 
-  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  const paths = await resolveCliRegistryPaths(values);
   const deleted = await deleteRegistryDefinition(paths, routeOrAlias);
   const port = Number(getStringValue(values, "port") ?? "8080");
   await refreshRegistry(paths, { port });
@@ -192,7 +203,7 @@ async function handleList(args: string[]) {
       port: { type: "string" },
     },
   });
-  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  const paths = await resolveCliRegistryPaths(values);
   const definitions = await listRegistryDefinitions(paths);
   const baseUrl = getRegistryBaseUrl(
     Number(getStringValue(values, "port") ?? "8080"),
@@ -242,7 +253,7 @@ async function handleRun(args: string[]) {
   const host = getStringValue(values, "host") ?? "127.0.0.1";
   const port = Number(getStringValue(values, "port") ?? "8080");
   const baseUrl = `http://${host}:${port}`;
-  const paths = await resolveRegistryPaths(getStringValue(values, "registry"));
+  const paths = await resolveCliRegistryPaths(values);
   const definition = await resolveRegistryDefinition(paths, selector);
   const toolName = getStringValue(values, "tool");
   const explicitPath = getStringValue(values, "path");

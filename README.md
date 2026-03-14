@@ -53,7 +53,7 @@ That folder contains:
 - `registry.sqlite`: local and pulled worker definitions
 - `config/`: generated runtime files for `workerd`
 
-If you want the registry in a custom path, use `YULA_REGISTRY_ROOT=/path/to/registry` or `--registry /path/to/registry`.
+If you want the registry in a custom path, use `YULA_REGISTRY_ROOT=/path/to/registry` or `--registry /path/to/registry`. `yula` subcommands now also respect `YULA_REGISTRY_ROOT`, so `serve`, `deploy`, `list`, and `run` can all point at the same SQLite file without repeating flags.
 
 ### 1. Start the registry runtime
 
@@ -75,7 +75,7 @@ pnpm --filter @yula-example/math-mcp deploy:registry
 ### 3. Inspect or run it through the CLI
 
 ```bash
-node packages/yula-cli/bin/yula.js list --registry apps/yula-registry
+node packages/yula-cli/bin/yula.js list
 node packages/yula-cli/bin/yula.js run math-mcp-v1-0-0
 node packages/yula-cli/bin/yula.js run math-mcp-v1-0-0 --tool add --input '{"a":12,"b":30}'
 ```

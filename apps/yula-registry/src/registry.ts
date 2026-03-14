@@ -95,6 +95,11 @@ export type RegistryPaths = {
   templatePath: string;
 };
 
+export type ResolveRegistryPathsOptions = {
+  startDir?: string;
+  stateRootBaseDir?: string;
+};
+
 export type RegistryRefreshResult = {
   port: number;
   routes: string[];
@@ -490,11 +495,12 @@ export function getRegistryBaseUrl(port = DEFAULT_PORT) {
 
 export async function resolveRegistryPaths(
   explicitStateRoot?: string,
-  startDir = process.cwd(),
+  options: ResolveRegistryPathsOptions = {},
 ): Promise<RegistryPaths> {
+  const startDir = options.startDir ?? process.cwd();
   const appRoot = await findRegistryAppRootFrom(startDir);
-  const resolutionBase = process.env.INIT_CWD
-    ? path.resolve(process.env.INIT_CWD)
+  const resolutionBase = options.stateRootBaseDir
+    ? path.resolve(options.stateRootBaseDir)
     : path.resolve(startDir);
   const stateRoot = explicitStateRoot
     ? path.resolve(resolutionBase, explicitStateRoot)

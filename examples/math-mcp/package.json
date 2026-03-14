@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx src/dev.ts",
     "build": "esbuild src/worker.ts --bundle --format=esm --target=esnext --platform=browser --outfile=dist/main.js",
-    "deploy:registry": "node ../../packages/yula-cli/bin/yula.js deploy dist/main.js --name math-mcp --version 1.0.0 --registry ../../apps/yula-registry",
+    "deploy:registry": "node ../../packages/yula-cli/bin/yula.js deploy dist/main.js --name math-mcp --version 1.0.0",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

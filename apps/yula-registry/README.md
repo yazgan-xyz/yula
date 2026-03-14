@@ -16,7 +16,7 @@ Default local state root:
 ~/.yula/registry
 ```
 
-You can override it with `YULA_REGISTRY_ROOT=/custom/path` or `--registry /custom/path` from `yula`.
+You can override it with `YULA_REGISTRY_ROOT=/custom/path` or `--registry /custom/path` from `yula`. The CLI also respects `YULA_REGISTRY_ROOT`, so `serve` and `yula run` can share the same SQLite file.
 
 Default runtime URL:
 
